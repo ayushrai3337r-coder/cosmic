@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>Cosmic - Exam notes for MSBTE and SSC</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+<style>
+.left{position:relative;width:100%;display:flex;flex-direction:column}
+.left-glass{position:absolute;inset:16px;border-radius:1.5rem}
+.left-inner{position:relative;display:flex;flex-direction:column;flex:1;padding:44px 36px 40px}
+.nav{display:flex;align-items:center;justify-content:space-between}
+.menu-btn{display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:9999px;font-size:.85rem}
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 0}
+.hero-logo .ic{width:80px;height:80px;margin-bottom:28px}
+.hero h1{font-size:clamp(2.9rem,6vw,4.5rem);line-height:1.02;letter-spacing:-.05em}
+.hero h1 em{color:rgba(255,255,255,.8)}
+.cta{display:inline-flex;align-items:center;gap:14px;margin-top:36px;padding:10px 12px 10px 28px;border-radius:9999px;font-size:.95rem;font-weight:500}
+.cta .circle{width:28px;height:28px;border-radius:9999px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+.pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:28px}
+.pill{padding:8px 18px;border-radius:9999px;font-size:.75rem;color:rgba(255,255,255,.8)}
+.quote-wrap{text-align:center;min-height:132px}
+.quote-label{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.quote-text{font-size:1.35rem;line-height:1.3;letter-spacing:-.02em;margin-top:12px;transition:opacity .6s}
+.quote-text .italic{color:rgba(255,255,255,.8)}
+.quote-author{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:16px;font-size:.7rem;letter-spacing:.2em;color:rgba(255,255,255,.6);transition:opacity .6s}
+.quote-author .line{width:36px;height:1px;background:rgba(255,255,255,.4)}
+.fade-out{opacity:0}
+.right{display:none;width:48%;flex-direction:column;padding:24px;gap:20px}
+.topbar{display:flex;align-items:center;justify-content:space-between}
+.social{display:flex;align-items:center;gap:16px;padding:10px 20px;border-radius:9999px}
+.social a{color:#fff;font-size:1.05rem;display:flex;transition:color .2s}
+.social a:hover{color:rgba(255,255,255,.8)}
+.account{display:flex;align-items:center;gap:10px;padding:6px 18px 6px 6px;border-radius:9999px;font-size:.85rem}
+.community{width:224px;padding:18px;border-radius:1.5rem}
+.community h3{font-size:.95rem;margin-bottom:6px}
+.community p{font-size:.75rem;line-height:1.6;color:rgba(255,255,255,.6)}
+.features{margin-top:auto;padding:14px;border-radius:2.5rem;display:flex;flex-direction:column;gap:12px}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f-card{padding:18px;border-radius:1.5rem}
+.f-card h3{font-size:.9rem;margin:14px 0 6px}
+.f-card p,.f-bottom p{font-size:.72rem;line-height:1.6;color:rgba(255,255,255,.6)}
+.f-bottom{display:flex;align-items:center;gap:14px;padding:12px;border-radius:1.5rem}
+.thumb{width:96px;height:64px;border-radius:1rem;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.f-bottom .txt{flex:1}
+.f-bottom h3{font-size:.9rem;margin-bottom:4px}
+.plus{width:40px;height:40px;border-radius:9999px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.menu-panel{position:fixed;top:32px;right:32px;z-index:50;width:min(260px,calc(100vw - 48px));padding:18px;border-radius:1.5rem;display:none;flex-direction:column;gap:4px}
+.menu-panel.open{display:flex;animation:fadeUp .4s both}
+.menu-panel a{padding:12px 14px;border-radius:.9rem;font-size:.9rem;color:rgba(255,255,255,.8);transition:background .2s}
+.menu-panel a:hover{background:rgba(255,255,255,.1);color:#fff}
+
+.intro{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:60px 16px}
+.intro-card{width:min(860px,100%);border-radius:2.5rem;padding:48px 40px 32px;touch-action:pan-y}
+.slides{display:grid}
+.slide{grid-area:1/1;opacity:0;transform:translateY(14px);transition:opacity .7s,transform .7s;pointer-events:none}
+.slide.on{opacity:1;transform:none;pointer-events:auto}
+.slide h2{font-size:clamp(2rem,5vw,3.4rem);letter-spacing:-.05em;line-height:1.05;margin:12px 0 16px}
+.slide h2 em{color:rgba(255,255,255,.8)}
+.slide p{max-width:560px;font-size:.95rem;line-height:1.7;color:rgba(255,255,255,.65)}
+.slide .btn{margin-top:26px}
+.intro-foot{display:flex;align-items:center;justify-content:space-between;margin-top:34px;gap:16px}
+.dots{display:flex;gap:8px}
+.dots i{width:8px;height:8px;border-radius:9999px;background:rgba(255,255,255,.25);transition:all .3s;cursor:pointer}
+.dots i.on{width:26px;background:#fff}
+.site-foot{position:relative;z-index:10;text-align:center;padding:30px 20px 40px;font-size:.75rem;color:rgba(255,255,255,.45)}
+.site-foot a{margin:0 10px;text-decoration:underline}
+@media(min-width:1024px){.left{width:52%}.left-glass{inset:24px}.left-inner{padding:56px 52px 48px}.right{display:flex}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" style="fill:currentColor;stroke:none"/><ellipse cx="12" cy="12" rx="10.5" ry="4" transform="rotate(-28 12 12)" style="fill:none;stroke:currentColor;stroke-width:1.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-twitter" viewBox="0 0 24 24"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></symbol>
+  <symbol id="i-instagram" viewBox="0 0 24 24"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+</svg>
+
+<video class="bg-video" autoplay loop muted playsinline src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260315_073750_51473149-4350-4920-ae24-c8214286f323.mp4"></video>
+
+<div class="menu-panel liquid-glass-strong" id="menu">
+  <a href="/">Home</a><a href="/notes">Browse Notes</a><a href="/signup">Create Account</a><a href="/login">Sign In</a><a href="/dashboard">Dashboard</a>
+</div>
+
+<div class="stage">
+  <section class="left">
+    <div class="left-glass liquid-glass-strong"></div>
+    <div class="left-inner">
+      <div class="nav reveal" style="--d:.1s">
+        <a href="/" class="brand"><svg class="ic"><use href="#i-logo"/></svg>cosmic</a>
+        <button class="menu-btn liquid-glass hoverable" id="menu-btn"><svg class="ic"><use href="#i-menu"/></svg>Menu</button>
+      </div>
+      <div class="hero">
+        <div class="hero-logo reveal" style="--d:.2s"><svg class="ic"><use href="#i-logo"/></svg></div>
+        <h1 class="reveal" style="--d:.35s">Study notes for the<br><em>exam that matters</em></h1>
+        <a href="/signup" class="cta liquid-glass-strong hoverable reveal" style="--d:.5s">Explore Notes<span class="circle"><svg class="ic"><use href="#i-download"/></svg></span></a>
+        <div class="pills reveal" style="--d:.65s">
+          <span class="pill liquid-glass">MSBTE Diploma</span><span class="pill liquid-glass">SSC Maharashtra</span><span class="pill liquid-glass">Important Questions</span>
+        </div>
+      </div>
+      <div class="quote-wrap reveal" style="--d:.8s">
+        <div class="quote-label">Topper's Rule</div>
+        <div class="quote-text" id="q-text"></div>
+        <div class="quote-author" id="q-author"><span class="line"></span><span id="q-name"></span><span class="line"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="topbar reveal" style="--d:.3s">
+      <div class="social liquid-glass">
+        <a href="#" aria-label="Twitter"><svg class="ic"><use href="#i-twitter"/></svg></a>
+        <a href="#" aria-label="LinkedIn"><svg class="ic"><use href="#i-linkedin"/></svg></a>
+        <a href="#" aria-label="Instagram"><svg class="ic"><use href="#i-instagram"/></svg></a>
+        <a href="/signup" aria-label="Join"><svg class="ic"><use href="#i-arrow"/></svg></a>
+      </div>
+      <a href="/login" class="account liquid-glass hoverable"><span class="icon-circle"><svg class="ic"><use href="#i-sparkles"/></svg></span>Account</a>
+    </div>
+    <div class="community liquid-glass reveal" style="--d:.45s">
+      <h3>Join the Cosmic circle</h3>
+      <p>Maharashtra students revising from the same focused notes.</p>
+    </div>
+    <div class="features liquid-glass reveal" style="--d:.6s">
+      <div class="f-row">
+        <div class="f-card liquid-glass hoverable"><div class="icon-circle"><svg class="ic"><use href="#i-wand"/></svg></div><h3>Instant Access</h3><p>Pay with any UPI app. Notes unlock once your payment is approved.</p></div>
+        <div class="f-card liquid-glass hoverable"><div class="icon-circle"><svg class="ic"><use href="#i-book"/></svg></div><h3>Notes Library</h3><p>Semester and subject wise PDFs for every MSBTE branch and SSC.</p></div>
+      </div>
+      <a href="/notes" class="f-bottom liquid-glass hoverable">
+        <div class="thumb"><svg width="44" height="44" viewBox="0 0 44 44" fill="none" stroke="rgba(255,255,255,.75)" stroke-width="1.6" stroke-linejoin="round"><rect x="9" y="6" width="22" height="30" rx="3" transform="rotate(-8 20 21)"/><rect x="13" y="8" width="22" height="30" rx="3" fill="rgba(255,255,255,.08)"/><path d="M18 17h12M18 23h12M18 29h7"/></svg></div>
+        <div class="txt"><h3>Exam Important Questions</h3><p>High chance questions sorted by chapter for fast revision.</p></div>
+        <span class="plus liquid-glass"><svg class="ic"><use href="#i-plus"/></svg></span>
+      </a>
+    </div>
+  </aside>
+</div>
+
+<section class="intro">
+  <div class="intro-card liquid-glass-strong" id="intro-card">
+    <div class="slides">
+      <article class="slide on">
+        <div class="eyebrow">01 / 03</div>
+        <h2>Notes written around <em>your exam</em></h2>
+        <p>Pick your board and branch. Every PDF is organised by semester and subject, with the important questions marked so you revise what repeats.</p>
+      </article>
+      <article class="slide">
+        <div class="eyebrow">02 / 03</div>
+        <h2>Pay with any <em>UPI app</em></h2>
+        <p>Tap pay, finish the payment in GPay, PhonePe or Paytm, then upload the screenshot. Your notes unlock as soon as it is approved.</p>
+      </article>
+      <article class="slide">
+        <div class="eyebrow">03 / 03</div>
+        <h2>One account, <em>one device</em></h2>
+        <p>Sign in with your mobile number and a code. Your account stays on a single device, so notes stay with the student who paid.</p>
+        <a href="/signup" class="btn liquid-glass-strong hoverable">Create your account</a>
+      </article>
+    </div>
+    <div class="intro-foot">
+      <div class="dots"><i class="on"></i><i></i><i></i></div>
+      <a href="/login" class="muted" style="text-decoration:underline">Already a member? Sign in</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-foot"><a href="/login">Sign in</a><a href="/signup">Sign up</a><a href="/notes">Notes</a><p style="margin-top:12px">Cosmic. Made for Maharashtra students.</p></footer>
+
+<script type="module">
+import '/js/app.js';
+const menu = document.getElementById('menu');
+document.getElementById('menu-btn').addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('open'); });
+document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.remove('open'); });
+
+const quotes = [
+  { a: 'Revise what repeats.', b: "Skip what doesn't.", n: 'THE TOPPER RULE' },
+  { a: 'Marks hide inside', b: 'the important questions.', n: 'COSMIC NOTES' },
+  { a: 'One night. One pack.', b: 'Zero panic.', n: 'COSMIC NOTES' }
+];
+const qt = document.getElementById('q-text'), qa = document.getElementById('q-author'), qn = document.getElementById('q-name');
+let qi = 0;
+const show = i => { qt.innerHTML = '<span>' + quotes[i].a + '</span> <span class="italic">' + quotes[i].b + '</span>'; qn.textContent = quotes[i].n; };
+show(0);
+setInterval(() => {
+  qt.classList.add('fade-out'); qa.classList.add('fade-out');
+  setTimeout(() => { qi = (qi + 1) % quotes.length; show(qi); qt.classList.remove('fade-out'); qa.classList.remove('fade-out'); }, 600);
+}, 5200);
+
+const slides = [...document.querySelectorAll('.slide')], dots = [...document.querySelectorAll('.dots i')];
+let cur = 0, timer;
+function go(n) {
+  cur = (n + slides.length) % slides.length;
+  slides.forEach((s, k) => s.classList.toggle('on', k === cur));
+  dots.forEach((d, k) => d.classList.toggle('on', k === cur));
+  clearInterval(timer);
+  timer = setInterval(() => go(cur + 1), 6500);
+}
+dots.forEach((d, k) => d.addEventListener('click', () => go(k)));
+const card = document.getElementById('intro-card');
+let sx = null;
+card.addEventListener('pointerdown', e => { sx = e.clientX; });
+card.addEventListener('pointerup', e => { if (sx === null) return; const d = e.clientX - sx; if (Math.abs(d) > 50) go(cur + (d < 0 ? 1 : -1)); sx = null; });
+go(0);
+</script>
+</body>
+</html>

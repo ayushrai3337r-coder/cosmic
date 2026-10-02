@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>Cosmic - Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<script type="module">
+import { mountShell, requireUser, api, esc, toast, BRANCH, BRANCH_PICK } from '/js/app.js';
+const view = mountShell('profile', 'Account', 'Your <em>profile</em>', 'Keep your board and branch updated so you see the right notes.');
+const me = await requireUser();
+const opts = BRANCH_PICK.map(k => `<option value="${k}" ${me.branch === k ? 'selected' : ''}>${BRANCH[k]}</option>`).join('');
+view.innerHTML = `
+  <div class="card liquid-glass reveal" style="max-width:560px;--d:.1s">
+    <div class="two">
+      <label class="field"><span>First name</span><input class="input" id="fn" value="${esc(me.firstName)}"></label>
+      <label class="field"><span>Last name</span><input class="input" id="ln" value="${esc(me.lastName)}"></label>
+    </div>
+    <label class="field"><span>Mobile number</span><input class="input" value="${esc(me.phone)}" disabled></label>
+    <label class="field"><span>Board</span>
+      <select class="input" id="board"><option value="msbte" ${me.board === 'msbte' ? 'selected' : ''}>MSBTE Diploma</option><option value="ssc" ${me.board === 'ssc' ? 'selected' : ''}>SSC Maharashtra</option></select>
+    </label>
+    <label class="field" id="bf" ${me.board === 'ssc' ? 'hidden' : ''}><span>Branch</span><select class="input" id="branch">${opts}</select></label>
+    <button class="btn liquid-glass-strong hoverable" id="save">Save changes</button>
+  </div>`;
+const $ = id => document.getElementById(id);
+$('board').onchange = () => { $('bf').hidden = $('board').value === 'ssc'; };
+$('save').onclick = async () => {
+  try {
+    await api('/api/me', { firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value }, { method: 'PATCH' });
+    toast('Profile saved');
+  } catch (e) { toast(e.message); }
+};
+</script>
+</body>
+</html>

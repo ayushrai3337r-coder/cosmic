@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="icon" href="/icons/icon.svg">
+<meta name="robots" content="noindex">
+<title>Cosmic - Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<main class="auth" id="gate">
+  <div class="box liquid-glass-strong reveal">
+    <a href="/" class="brand" id="brand" style="justify-content:center;margin-bottom:24px"></a>
+    <h1>Admin <em>access</em></h1>
+    <p class="sub">Restricted area. Enter the admin password.</p>
+    <label class="field"><span>Password</span><input class="input" type="password" id="pw" autocomplete="current-password"></label>
+    <button class="btn liquid-glass-strong hoverable block" id="in">Enter</button>
+    <p class="msg" id="msg"></p>
+  </div>
+</main>
+
+<div class="app" id="panel" hidden>
+  <main class="content" style="max-width:1100px;margin:0 auto;width:100%">
+    <div class="page-head"><div class="eyebrow">Cosmic admin</div><h1>Control <em>room</em></h1></div>
+    <div class="chips" id="tabs">
+      <button class="chip liquid-glass hoverable" data-t="orders">Orders</button>
+      <button class="chip liquid-glass hoverable" data-t="upload">Upload</button>
+      <button class="chip liquid-glass hoverable" data-t="notes">Notes</button>
+      <button class="chip liquid-glass hoverable" data-t="users">Users</button>
+      <button class="chip liquid-glass hoverable" data-t="out">Sign out</button>
+    </div>
+    <div id="v"></div>
+  </main>
+</div>
+
+<script type="module">
+import { mountBg, icon, api, cloudUpload, esc, fmtDate, tag, toast, BRANCH } from '/js/app.js';
+mountBg();
+const $ = id => document.getElementById(id);
+$('brand').innerHTML = icon('logo') + 'cosmic';
+const A = { admin: true };
+let D = { orders: [], users: [], notes: [] }, tab = 'orders', filt = 'all', q = '';
+
+async function load() {
+  try { D = await api('/api/admin/data', undefined, A); $('gate').hidden = true; $('panel').hidden = false; draw(); }
+  catch (e) { sessionStorage.removeItem('at'); $('panel').hidden = true; $('gate').hidden = false; $('msg').textContent = 'Session ended. Enter the password again.'; }
+}
+$('in').onclick = async () => {
+  try {
+    const r = await api('/api/admin/login', { password: $('pw').value });
+    sessionStorage.setItem('at', r.token);
+    $('pw').value = '';
+    $('msg').textContent = '';
+    load();
+  } catch (e) { $('msg').textContent = e.message; }
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('in').click(); });
+if (sessionStorage.getItem('at')) load();
+
+const stat = (l, n) => `<div class="card stat liquid-glass"><div class="label">${l}</div><div class="num">${n}</div></div>`;
+
+function ordersView() {
+  const list = D.orders.filter(o => (filt === 'all' || o.status === filt) && (!q || [o.userName, o.phone, o.title].join(' ').toLowerCase().includes(q)));
+  const c = s => D.orders.filter(o => o.status === s).length;
+  return `
+    <div class="grid g-stats">${stat('Orders', D.orders.length)}${stat('Pending', c('pending'))}${stat('Approved', c('approved'))}${stat('Users', D.users.length)}</div>
+    <input class="input" id="q" placeholder="Search name, phone or notes" value="${esc(q)}" style="margin:20px 0 14px">
+    <div class="chips">${['all', 'pending', 'approved', 'rejected'].map(s => `<button class="chip liquid-glass hoverable ${filt === s ? 'on' : ''}" data-f="${s}">${s}</button>`).join('')}</div>
+    <div class="list">${list.map(o => `
+      <div class="row liquid-glass">
+        <div class="grow"><h3>${esc(o.title)}</h3><div class="muted">${esc(o.userName)} &middot; ${esc(o.phone)} &middot; ${fmtDate(o.createdAt)} &middot; Order #${o.id}</div></div>
+        <div class="price">Rs ${o.amount}</div>
+        ${o.shotUrl ? `<a class="btn liquid-glass hoverable sm" target="_blank" rel="noopener" href="${esc(o.shotUrl)}">Screenshot</a>` : '<span class="muted">No screenshot</span>'}
+        ${tag(o.status)}
+        <div class="acts">${['approved', 'rejected', 'pending'].filter(s => s !== o.status).map(s => `<button class="btn liquid-glass hoverable sm" data-o="${o.id}" data-s="${s}">${s === 'approved' ? 'Approve' : s === 'rejected' ? 'Reject' : 'Reset'}</button>`).join('')}</div>
+      </div>`).join('') || '<div class="empty">No orders found</div>'}</div>`;
+}
+
+function uploadView() {
+  const br = Object.entries(BRANCH).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+  const sem = [1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">Semester ${n}</option>`).join('') + '<option value="all">All semesters</option>';
+  return `
+    <div class="card liquid-glass" style="max-width:680px">
+      <div class="two">
+        <label class="field"><span>Title</span><input class="input" id="u-title" placeholder="Engineering Maths Sem 1"></label>
+        <label class="field"><span>Price (Rs, 0 for free)</span><input class="input" id="u-price" type="number" min="0" placeholder="49"></label>
+        <label class="field"><span>Board</span><select class="input" id="u-board"><option value="msbte">MSBTE Diploma</option><option value="ssc">SSC Maharashtra</option></select></label>
+        <label class="field"><span>Branch</span><select class="input" id="u-branch">${br}</select></label>
+        <label class="field"><span>Semester</span><select class="input" id="u-sem">${sem}</select></label>
+        <label class="field"><span>Subject code</span><input class="input" id="u-code" placeholder="22213"></label>
+      </div>
+      <label class="field"><span>Description</span><textarea class="input" id="u-desc" placeholder="What is inside these notes"></textarea></label>
+      <label class="field"><span>PDF file</span><input class="input" id="u-file" type="file" accept="application/pdf"></label>
+      <button class="btn liquid-glass-strong hoverable" id="up-go">${icon('upload')}Upload and publish</button>
+    </div>`;
+}
+
+function notesView() {
+  return `<div class="list">${D.notes.map(n => `
+    <div class="row liquid-glass">
+      <div class="grow"><h3>${esc(n.title)}</h3><div class="muted">${n.board === 'ssc' ? 'SSC' : 'MSBTE'} &middot; ${esc(BRANCH[n.branch] || n.branch)} &middot; Sem ${esc(n.semester)}</div></div>
+      <div class="price">Rs ${n.price}</div>
+      <span class="tag ${n.active ? 'ok' : 'no'}">${n.active ? 'Live' : 'Hidden'}</span>
+      <div class="acts">
+        <button class="btn liquid-glass hoverable sm" data-tg="${n.id}">${n.active ? 'Hide' : 'Show'}</button>
+        <button class="btn liquid-glass hoverable sm" data-del="${n.id}">Delete</button>
+      </div>
+    </div>`).join('') || '<div class="empty">No notes uploaded yet</div>'}</div>`;
+}
+
+function usersView() {
+  return `<div class="list">${D.users.map(u => `
+    <div class="row liquid-glass">
+      <div class="grow"><h3>${esc(u.name.trim() || 'Unnamed')}</h3><div class="muted">${esc(u.phone)} &middot; Joined ${fmtDate(u.createdAt)}</div></div>
+      <span class="tag">${u.board === 'ssc' ? 'SSC' : 'MSBTE'}</span>
+      <span class="muted">${esc(BRANCH[u.branch] || u.branch || '-')}</span>
+      <span class="tag ok">${u.unlocked} unlocked</span>
+    </div>`).join('') || '<div class="empty">No users yet</div>'}</div>`;
+}
+
+function draw() {
+  document.querySelectorAll('#tabs .chip').forEach(c => c.classList.toggle('on', c.dataset.t === tab));
+  $('v').innerHTML = { orders: ordersView, upload: uploadView, notes: notesView, users: usersView }[tab]();
+  const s = $('q');
+  if (s && q) { s.focus(); s.setSelectionRange(q.length, q.length); }
+}
+
+$('tabs').addEventListener('click', e => {
+  const c = e.target.closest('[data-t]');
+  if (!c) return;
+  if (c.dataset.t === 'out') { sessionStorage.removeItem('at'); location.reload(); return; }
+  tab = c.dataset.t;
+  draw();
+});
+$('v').addEventListener('input', e => { if (e.target.id === 'q') { q = e.target.value.toLowerCase().trim(); draw(); } });
+
+$('v').addEventListener('click', async e => {
+  const t = e.target;
+  try {
+    const f = t.closest('[data-f]');
+    if (f) { filt = f.dataset.f; return draw(); }
+    const o = t.closest('[data-o]');
+    if (o) { await api('/api/admin/orders/' + o.dataset.o, { status: o.dataset.s }, A); return load(); }
+    const tg = t.closest('[data-tg]');
+    if (tg) { await api('/api/admin/notes/' + tg.dataset.tg + '/toggle', {}, A); return load(); }
+    const del = t.closest('[data-del]');
+    if (del) {
+      if (!confirm('Delete these notes and their orders permanently?')) return;
+      await api('/api/admin/notes/' + del.dataset.del, undefined, { admin: true, method: 'DELETE' });
+      return load();
+    }
+    const up = t.closest('#up-go');
+    if (up) {
+      const file = $('u-file').files[0], title = $('u-title').value.trim(), price = $('u-price').value;
+      if (!title || price === '' || !file) return toast('Title, price and a PDF are required');
+      if (file.type !== 'application/pdf') return toast('Only PDF files are allowed');
+      up.disabled = true;
+      toast('Uploading, please wait');
+      const sign = await api('/api/admin/sign', {}, A);
+      const pdfPublicId = await cloudUpload(file, sign);
+      await api('/api/admin/notes', {
+        title, price, pdfPublicId,
+        board: $('u-board').value, branch: $('u-branch').value, semester: $('u-sem').value,
+        subjectCode: $('u-code').value.trim(), description: $('u-desc').value.trim()
+      }, A);
+      toast('Notes published');
+      tab = 'notes';
+      await load();
+    }
+  } catch (err) { toast(err.message); draw(); }
+});
+</script>
+</body>
+</html>

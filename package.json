@@ -1,0 +1,23 @@
+{
+  "name": "cosmic",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node server.js",
+    "db": "node scripts/setup-db.js",
+    "icons": "node scripts/icons.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "cloudinary": "^2.11.0",
+    "dotenv": "^18.0.5",
+    "express": "^4.22.3",
+    "jose": "^5.10.0"
+  }
+}

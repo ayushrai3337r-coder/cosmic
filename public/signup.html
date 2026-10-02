@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>Cosmic - Create account</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<main class="auth">
+  <div class="box liquid-glass-strong reveal">
+    <a href="/" class="brand" id="brand" style="justify-content:center;margin-bottom:24px"></a>
+    <h1>Create your <em>account</em></h1>
+    <p class="sub">Your mobile number is your login. No password to remember.</p>
+    <div class="two">
+      <label class="field"><span>First name</span><input class="input" id="fn" autocomplete="given-name"></label>
+      <label class="field"><span>Last name</span><input class="input" id="ln" autocomplete="family-name"></label>
+    </div>
+    <label class="field"><span>Board</span><select class="input" id="board"><option value="msbte">MSBTE Diploma</option><option value="ssc">SSC Maharashtra</option></select></label>
+    <label class="field" id="bf"><span>Branch</span><select class="input" id="branch"></select></label>
+    <label class="field"><span>Mobile number</span><input class="input" id="phone" type="tel" inputmode="numeric" placeholder="98765 43210" autocomplete="tel-national"></label>
+    <label class="field" id="cf" hidden><span>6 digit code</span><input class="input code" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
+    <button class="btn liquid-glass-strong hoverable block" id="go">Send code</button>
+    <p class="msg" id="msg"></p>
+    <p class="switch">Already registered? <a href="/login">Sign in</a></p>
+  </div>
+</main>
+<div id="rc"></div>
+<script type="module">
+import { mountBg, icon, setToken, BRANCH, BRANCH_PICK } from '/js/app.js';
+import { phoneNumber, sendCode, verifyCode } from '/js/otp.js';
+mountBg();
+const $ = id => document.getElementById(id);
+$('brand').innerHTML = icon('logo') + 'cosmic';
+$('branch').innerHTML = BRANCH_PICK.map(k => `<option value="${k}">${BRANCH[k]}</option>`).join('');
+$('board').onchange = () => { $('bf').hidden = $('board').value === 'ssc'; };
+const say = t => { $('msg').textContent = t || ''; };
+let sent = false;
+$('go').onclick = async () => {
+  const btn = $('go');
+  btn.disabled = true;
+  try {
+    if (!sent) {
+      if (!$('fn').value.trim()) throw new Error('Enter your first name');
+      const p = phoneNumber($('phone').value);
+      if (!p) throw new Error('Enter a valid 10 digit mobile number');
+      say('Sending code...');
+      await sendCode(p);
+      sent = true;
+      $('cf').hidden = false;
+      $('code').focus();
+      btn.textContent = 'Verify and create account';
+      say('Code sent. Check your messages.');
+    } else {
+      const code = $('code').value.trim();
+      if (code.length !== 6) throw new Error('Enter the 6 digit code');
+      const r = await verifyCode(code, { firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value });
+      setToken(r.token);
+      location.href = '/dashboard';
+      return;
+    }
+  } catch (e) {
+    say(String(e.message).includes('auth/') ? 'Could not verify. Check the number or code and try again.' : e.message);
+  }
+  btn.disabled = false;
+};
+</script>
+</body>
+</html>

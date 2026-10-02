@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>Cosmic - Orders</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<script type="module">
+import { mountShell, requireUser, api, cloudUpload, esc, fmtDate, tag, toast } from '/js/app.js';
+const view = mountShell('orders', 'Payments', 'Your <em>orders</em>', 'Pay with UPI, then upload the screenshot so we can approve your access.');
+await requireUser();
+const $ = id => document.getElementById(id);
+let orders = [], f = 'all', cur = null;
+
+function draw() {
+  const pend = orders.filter(o => o.status === 'pending').length;
+  const spent = orders.filter(o => o.status === 'approved').reduce((s, o) => s + o.amount, 0);
+  const list = orders.filter(o => f === 'all' || o.status === f);
+  view.innerHTML = `
+    <div class="grid g-stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card stat liquid-glass"><div class="label">Orders</div><div class="num">${orders.length}</div></div>
+      <div class="card stat liquid-glass"><div class="label">Pending</div><div class="num">${pend}</div></div>
+      <div class="card stat liquid-glass"><div class="label">Spent</div><div class="num">Rs ${spent}</div></div>
+    </div>
+    <div class="chips" style="margin-top:22px">
+      ${['all', 'pending', 'approved', 'rejected'].map(s => `<button class="chip liquid-glass hoverable ${f === s ? 'on' : ''}" data-f="${s}">${s}</button>`).join('')}
+    </div>
+    <div class="list">
+      ${list.map(o => {
+        const act = o.status === 'approved' ? `<a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${o.noteId}">Open notes</a>`
+          : o.status === 'rejected' ? '<span class="muted">Rejected. Contact support with your order number.</span>'
+          : o.hasShot ? '<span class="muted">Screenshot sent. Waiting for approval.</span>'
+          : `<a class="btn liquid-glass hoverable sm" href="${esc(o.upi)}">Pay with UPI</a><button class="btn liquid-glass-strong hoverable sm" data-up="${o.id}">Upload screenshot</button>`;
+        return `
+          <div class="row liquid-glass">
+            <div class="grow"><h3>${esc(o.title)}</h3><div class="muted">Order #${o.id} &middot; ${fmtDate(o.createdAt)}</div></div>
+            <div class="price">Rs ${o.amount}</div>${tag(o.status)}
+            <div class="acts">${act}</div>
+          </div>`;
+      }).join('') || '<div class="empty">No orders here. <a href="/notes">Browse notes</a></div>'}
+    </div>`;
+}
+
+document.body.insertAdjacentHTML('beforeend', `
+  <div class="modal" id="um"><div class="box liquid-glass-strong">
+    <div class="eyebrow">Final step</div>
+    <h3>Upload payment <em>screenshot</em></h3>
+    <p class="muted" style="margin-bottom:18px">Take a screenshot of the successful UPI payment screen and choose it below.</p>
+    <label class="field"><span>Screenshot</span><input class="input" type="file" accept="image/*" id="ss"></label>
+    <div class="acts"><button class="btn white hoverable" id="us">Submit</button><button class="btn liquid-glass hoverable" id="ux">Cancel</button></div>
+  </div></div>`);
+$('ux').onclick = () => $('um').classList.remove('open');
+
+view.addEventListener('click', e => {
+  const c = e.target.closest('[data-f]');
+  if (c) { f = c.dataset.f; draw(); return; }
+  const u = e.target.closest('[data-up]');
+  if (u) { cur = u.dataset.up; $('ss').value = ''; $('um').classList.add('open'); }
+});
+
+$('us').onclick = async () => {
+  const file = $('ss').files[0];
+  if (!file) return toast('Choose a screenshot first');
+  if (file.size > 8 * 1024 * 1024) return toast('Image is over 8 MB');
+  const b = $('us');
+  b.disabled = true;
+  b.textContent = 'Uploading...';
+  try {
+    const sign = await api('/api/orders/' + cur + '/shot-sign', {});
+    const pid = await cloudUpload(file, sign);
+    await api('/api/orders/' + cur + '/shot', { publicId: pid });
+    toast('Screenshot sent for review');
+    $('um').classList.remove('open');
+    orders = await api('/api/orders');
+    draw();
+  } catch (e) { toast(e.message); }
+  b.disabled = false;
+  b.textContent = 'Submit';
+};
+
+orders = await api('/api/orders');
+draw();
+</script>
+</body>
+</html>
