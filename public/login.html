@@ -53,7 +53,7 @@ $('go').onclick = async () => {
       else { setToken(r.token); location.href = '/dashboard'; return; }
     }
   } catch (e) {
-    say(String(e.message).includes('auth/') ? 'Could not verify. Check the number or code and try again.' : e.message);
+    console.error(e); say(e.code || e.message);
   }
   btn.disabled = false;
 };
