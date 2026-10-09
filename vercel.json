@@ -1,7 +1,7 @@
 {
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": "public",
   "cleanUrls": true,
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }],
-  "buildCommand": "npm run build",
-  "outputDirectory": "./",
-  "crons": []
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }]
 }
