@@ -11,51 +11,85 @@
 <main class="auth">
   <div class="box liquid-glass-strong reveal">
     <a href="/" class="brand" id="brand" style="justify-content:center;margin-bottom:24px"></a>
-    <h1>Welcome <em>back</em></h1>
-    <p class="sub">Sign in with your mobile number. We will text you a code.</p>
-    <label class="field"><span>Mobile number</span><input class="input" id="phone" type="tel" inputmode="numeric" placeholder="98765 43210" autocomplete="tel-national"></label>
-    <label class="field" id="cf" hidden><span>6 digit code</span><input class="input code" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>
-    <button class="btn liquid-glass-strong hoverable block" id="go">Send code</button>
+    <div id="s1">
+      <h1>Welcome to <em>cosmic</em></h1>
+      <p class="sub">Continue with your Google account. No password to remember and no codes to wait for.</p>
+      <button class="btn liquid-glass-strong hoverable block" id="g"><span class="icon-circle">G</span>Continue with Google</button>
+    </div>
+    <div id="s2" hidden>
+      <h1>One last <em>step</em></h1>
+      <p class="sub" id="who"></p>
+      <div class="two">
+        <label class="field"><span>First name</span><input class="input" id="fn"></label>
+        <label class="field"><span>Last name</span><input class="input" id="ln"></label>
+      </div>
+      <label class="field"><span>Board</span><select class="input" id="board"><option value="msbte">MSBTE Diploma</option><option value="ssc">SSC Maharashtra</option></select></label>
+      <label class="field" id="bf"><span>Branch</span><select class="input" id="branch"></select></label>
+      <button class="btn liquid-glass-strong hoverable block" id="go">Create account</button>
+    </div>
     <p class="msg" id="msg"></p>
-    <p class="switch">New here? <a href="/signup">Create an account</a></p>
+    <p class="switch">One account works on one device at a time.</p>
   </div>
 </main>
-<div id="rc"></div>
 <script type="module">
-import { mountBg, icon, setToken, token } from '/js/app.js';
-import { phoneNumber, sendCode, verifyCode } from '/js/otp.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { mountBg, icon, api, setToken, BRANCH, BRANCH_PICK } from '/js/app.js';
 mountBg();
 const $ = id => document.getElementById(id);
 $('brand').innerHTML = icon('logo') + 'cosmic';
+$('branch').innerHTML = BRANCH_PICK.map(k => `<option value="${k}">${BRANCH[k]}</option>`).join('');
+$('board').onchange = () => { $('bf').hidden = $('board').value === 'ssc'; };
 const say = t => { $('msg').textContent = t || ''; };
 const stored = sessionStorage.getItem('msg');
 if (stored) { say(stored); sessionStorage.removeItem('msg'); }
-let sent = false;
-$('go').onclick = async () => {
-  const btn = $('go');
-  btn.disabled = true;
+
+const auth = getAuth(initializeApp(await (await fetch('/api/config')).json()));
+let idToken = null;
+
+const friendly = e => ({
+  'auth/popup-closed-by-user': 'Sign in was cancelled.',
+  'auth/cancelled-popup-request': 'Sign in was cancelled.',
+  'auth/popup-blocked': 'Your browser blocked the Google window. Allow pop-ups for this site and try again.',
+  'auth/unauthorized-domain': 'This website address is not added to Firebase Authorized domains yet.',
+  'auth/operation-not-allowed': 'Google sign in is not turned on in Firebase yet.'
+}[e.code] || e.code || e.message);
+
+$('g').onclick = async () => {
+  const b = $('g');
+  b.disabled = true;
+  say('');
   try {
-    if (!sent) {
-      const p = phoneNumber($('phone').value);
-      if (!p) throw new Error('Enter a valid 10 digit mobile number');
-      say('Sending code...');
-      await sendCode(p);
-      sent = true;
-      $('cf').hidden = false;
-      $('code').focus();
-      btn.textContent = 'Verify and sign in';
-      say('Code sent. Check your messages.');
+    const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+    idToken = await cred.user.getIdToken();
+    const r = await api('/api/auth/login', { idToken });
+    if (r.needsSignup) {
+      const parts = (r.name || '').split(' ');
+      $('fn').value = parts[0] || '';
+      $('ln').value = parts.slice(1).join(' ');
+      $('who').textContent = 'Signed in as ' + r.email + '. Tell us your board so we show the right notes.';
+      $('s1').hidden = true;
+      $('s2').hidden = false;
     } else {
-      const code = $('code').value.trim();
-      if (code.length !== 6) throw new Error('Enter the 6 digit code');
-      const r = await verifyCode(code);
-      if (r.needsSignup) { say('No account found for this number. Please create one first.'); sent = false; $('cf').hidden = true; btn.textContent = 'Send code'; }
-      else { setToken(r.token); location.href = '/dashboard'; return; }
+      setToken(r.token);
+      location.href = '/dashboard';
+      return;
     }
-  } catch (e) {
-    console.error(e); say(e.code || e.message);
-  }
-  btn.disabled = false;
+  } catch (e) { say(friendly(e)); }
+  b.disabled = false;
+};
+
+$('go').onclick = async () => {
+  const b = $('go');
+  b.disabled = true;
+  say('');
+  try {
+    const r = await api('/api/auth/login', { idToken, profile: { firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value } });
+    setToken(r.token);
+    location.href = '/dashboard';
+    return;
+  } catch (e) { say(e.message); }
+  b.disabled = false;
 };
 </script>
 </body>

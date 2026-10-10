@@ -9,10 +9,12 @@
 </head>
 <body>
 <script type="module">
-import { mountShell, requireUser, api, esc, toast, BRANCH } from '/js/app.js';
-const view = mountShell('notes', 'Library', 'Browse <em>notes</em>', 'Pick a subject, pay with UPI and it unlocks once your payment is approved.');
+import { mountShell, requireUser, api, payModal, esc, toast, BRANCH } from '/js/app.js';
+const view = mountShell('notes', 'Library', 'Browse <em>notes</em>', 'Pick a subject, scan the QR to pay, and it unlocks once your payment is approved.');
 await requireUser();
-const notes = await api('/api/notes');
+let notes;
+try { notes = await api('/api/notes'); }
+catch (e) { view.innerHTML = '<div class="empty">Could not load notes: ' + esc(e.message) + '</div>'; throw e; }
 let board = 'all', q = '';
 const $ = id => document.getElementById(id);
 
@@ -27,25 +29,13 @@ view.innerHTML = `
   </div>
   <div class="grid g-cards" id="grid"></div>`;
 
-document.body.insertAdjacentHTML('beforeend', `
-  <div class="modal" id="m"><div class="box liquid-glass-strong">
-    <div class="eyebrow">Checkout</div>
-    <h3 id="m-t"></h3>
-    <div class="price" id="m-a"></div>
-    <p class="muted" style="margin-top:12px">Tap Pay with UPI, finish the payment in your UPI app, then upload the screenshot on the Orders page. Notes unlock after approval.</p>
-    <div class="acts" style="margin-top:22px">
-      <a class="btn white hoverable" id="m-pay" href="#">Pay with UPI</a>
-      <a class="btn liquid-glass hoverable" href="/orders">I have paid</a>
-      <button class="btn liquid-glass hoverable" id="m-x">Close</button>
-    </div>
-  </div></div>`);
-$('m-x').onclick = () => $('m').classList.remove('open');
+const pay = payModal(async () => { notes = await api('/api/notes'); draw(); });
 
 function draw() {
   const list = notes.filter(n => (board === 'all' || n.board === board) && (!q || [n.title, n.branch, n.subjectCode].join(' ').toLowerCase().includes(q)));
   $('grid').innerHTML = list.map(n => {
     const btn = n.status === 'approved' ? `<a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${n.id}">Open</a>`
-      : n.status === 'pending' ? '<a class="btn liquid-glass-strong hoverable sm" href="/orders">Pending</a>'
+      : n.status === 'pending' ? `<button class="btn liquid-glass-strong hoverable sm" data-pay="${n.id}">Pay or upload</button>`
       : `<button class="btn liquid-glass-strong hoverable sm" data-buy="${n.id}">${n.price === 0 ? 'Get free' : 'Buy now'}</button>`;
     return `
       <div class="card liquid-glass">
@@ -69,21 +59,17 @@ view.querySelector('.chips').addEventListener('click', e => {
 });
 
 $('grid').addEventListener('click', async e => {
-  const b = e.target.closest('[data-buy]');
+  const b = e.target.closest('[data-buy], [data-pay]');
   if (!b) return;
   b.disabled = true;
   try {
-    const n = notes.find(x => x.id === Number(b.dataset.buy));
+    const n = notes.find(x => x.id === Number(b.dataset.buy || b.dataset.pay));
     const r = await api('/api/orders', { noteId: n.id });
     n.status = r.status;
     if (r.status === 'approved') { toast('Unlocked. Open it from your dashboard.'); draw(); return; }
-    $('m-t').textContent = n.title;
-    $('m-a').textContent = 'Rs ' + r.amount;
-    $('m-pay').href = r.upi;
-    $('m').classList.add('open');
+    pay.open({ id: r.id, title: n.title, amount: r.amount });
     draw();
-  } catch (err) { toast(err.message); }
-  b.disabled = false;
+  } catch (err) { toast(err.message); b.disabled = false; }
 });
 </script>
 </body>

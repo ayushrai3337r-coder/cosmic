@@ -12,15 +12,15 @@ const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/service_acco
 
 const app = express();
 app.use(express.json({ limit: '100kb' }));
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(err => { console.error(err); res.status(500).json({ error: 'Server error' }); });
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const bearer = req => (req.headers.authorization || '').replace(/^Bearer /, '');
 const clean = (v, n) => String(v || '').trim().slice(0, n);
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-const pubUser = u => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, phone: u.phone, board: u.board, branch: u.branch, createdAt: u.created_at });
+const pubUser = u => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, phone: u.phone, board: u.board, branch: u.branch, createdAt: u.created_at });
 const signedUrl = (pid, resource) => cloudinary.url(pid, { resource_type: resource, type: 'authenticated', sign_url: true, secure: true });
-const upiLink = o => 'upi://pay?pa=' + encodeURIComponent(E.UPI_ID || '') + '&pn=' + encodeURIComponent(E.UPI_NAME || 'Cosmic') + '&am=' + o.amount + '&cu=INR&tn=' + encodeURIComponent('Cosmic ' + o.id);
 
 function signUpload(publicId, resource) {
   const params = { public_id: publicId, timestamp: Math.round(Date.now() / 1000), type: 'authenticated' };
@@ -28,10 +28,11 @@ function signUpload(publicId, resource) {
   return { ...params, signature, apiKey: E.CLOUDINARY_API_KEY, cloudName: E.CLOUDINARY_CLOUD_NAME, resource };
 }
 
-async function firebaseUser(idToken) {
+async function googleUser(idToken) {
   const { payload } = await jwtVerify(idToken, JWKS, { issuer: 'https://securetoken.google.com/' + E.FIREBASE_PROJECT_ID, audience: E.FIREBASE_PROJECT_ID });
-  if (!payload.sub || !payload.phone_number) throw new Error('no phone');
-  return { uid: payload.sub, phone: payload.phone_number };
+  if (!payload.sub || !payload.email || payload.email_verified === false) throw new Error('bad token');
+  if (payload.firebase && payload.firebase.sign_in_provider !== 'google.com') throw new Error('bad provider');
+  return { uid: payload.sub, email: String(payload.email).toLowerCase(), name: String(payload.name || '') };
 }
 
 const auth = wrap(async (req, res, next) => {
@@ -54,18 +55,20 @@ app.get('/api/config', (req, res) => res.json({
 
 /* ---------- auth ---------- */
 app.post('/api/auth/login', wrap(async (req, res) => {
-  let f;
-  try { f = await firebaseUser(String(req.body.idToken || '')); }
-  catch (e) { return res.status(401).json({ error: 'Could not verify your number. Try again.' }); }
-  let u = (await sql`select * from users where firebase_uid = ${f.uid}`)[0];
+  let g;
+  try { g = await googleUser(String(req.body.idToken || '')); }
+  catch (e) { return res.status(401).json({ error: 'Could not verify your Google account. Try again.' }); }
+  let u = (await sql`select * from users where firebase_uid = ${g.uid}`)[0];
   if (!u) {
     const p = req.body.profile;
-    if (!p || !clean(p.firstName, 40)) return res.json({ needsSignup: true });
+    if (!p) return res.json({ needsSignup: true, name: g.name, email: g.email });
+    const first = clean(p.firstName, 40);
+    if (!first) return res.status(400).json({ error: 'Enter your first name' });
     const board = p.board === 'ssc' ? 'ssc' : 'msbte';
     const branch = board === 'ssc' ? 'ssc-general' : clean(p.branch, 30);
-    u = (await sql`insert into users (firebase_uid, phone, first_name, last_name, board, branch)
-      values (${f.uid}, ${f.phone}, ${clean(p.firstName, 40)}, ${clean(p.lastName, 40)}, ${board}, ${branch})
-      on conflict (firebase_uid) do update set phone = excluded.phone returning *`)[0];
+    u = (await sql`insert into users (firebase_uid, email, first_name, last_name, board, branch)
+      values (${g.uid}, ${g.email}, ${first}, ${clean(p.lastName, 40)}, ${board}, ${branch})
+      on conflict (firebase_uid) do update set email = excluded.email returning *`)[0];
   }
   const token = crypto.randomBytes(32).toString('hex');
   await sql`update users set session_hash = ${sha(token)}, session_at = now() where id = ${u.id}`;
@@ -105,16 +108,15 @@ app.post('/api/orders', auth, wrap(async (req, res) => {
     const status = n.price === 0 ? 'approved' : 'pending';
     o = (await sql`insert into orders (user_id, note_id, amount, status) values (${req.user.id}, ${n.id}, ${n.price}, ${status}) returning *`)[0];
   }
-  res.json({ id: o.id, status: o.status, amount: o.amount, title: n.title, upi: o.status === 'pending' ? upiLink(o) : null });
+  res.json({ id: o.id, status: o.status, amount: o.amount, title: n.title });
 }));
 
 app.get('/api/orders', auth, wrap(async (req, res) => {
-  const rows = await sql`
+  res.json(await sql`
     select o.id, o.amount, o.status, o.created_at as "createdAt", o.note_id as "noteId",
       (o.shot_public_id is not null) as "hasShot", n.title, n.board
     from orders o join notes n on n.id = o.note_id
-    where o.user_id = ${req.user.id} order by o.created_at desc`;
-  res.json(rows.map(o => ({ ...o, upi: o.status === 'pending' ? upiLink(o) : null })));
+    where o.user_id = ${req.user.id} order by o.created_at desc`);
 }));
 
 async function myPendingOrder(req) {
@@ -154,11 +156,13 @@ app.post('/api/admin/login', wrap(async (req, res) => {
 
 app.get('/api/admin/data', adminOnly, wrap(async (req, res) => {
   const [orders, notes, users] = await Promise.all([
-    sql`select o.id, o.amount, o.status, o.created_at as "createdAt", o.shot_public_id, u.first_name || ' ' || u.last_name as "userName", u.phone, n.title
+    sql`select o.id, o.amount, o.status, o.created_at as "createdAt", o.shot_public_id,
+          u.first_name || ' ' || u.last_name as "userName", coalesce(u.email, u.phone) as phone, n.title
         from orders o join users u on u.id = o.user_id join notes n on n.id = o.note_id order by o.created_at desc`,
     sql`select id, title, board, branch, semester, subject_code as "subjectCode", price, active, created_at as "createdAt" from notes order by created_at desc`,
-    sql`select u.id, u.first_name || ' ' || u.last_name as name, u.phone, u.board, u.branch, u.created_at as "createdAt",
-        (select count(*)::int from orders o where o.user_id = u.id and o.status = 'approved') as unlocked from users u order by u.created_at desc`
+    sql`select u.id, u.first_name || ' ' || u.last_name as name, coalesce(u.email, u.phone) as phone, u.board, u.branch, u.created_at as "createdAt",
+          (select count(*)::int from orders o where o.user_id = u.id and o.status = 'approved') as unlocked
+        from users u order by u.created_at desc`
   ]);
   res.json({
     orders: orders.map(({ shot_public_id, ...o }) => ({ ...o, shotUrl: shot_public_id ? signedUrl(shot_public_id, 'image') : null })),

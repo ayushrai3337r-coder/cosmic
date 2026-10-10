@@ -12,7 +12,7 @@
 import { mountShell, requireUser, api, clearToken, esc, fmtDate, icon, BOARD, BRANCH } from '/js/app.js';
 const view = mountShell('settings', 'Preferences', '<em>Settings</em>', 'Your account details and session.');
 const me = await requireUser();
-const rows = [['Mobile', me.phone], ['Board', BOARD[me.board]], ['Branch', BRANCH[me.branch]], ['Member since', fmtDate(me.createdAt)]];
+const rows = [['Email', me.email || me.phone], ['Board', BOARD[me.board]], ['Branch', BRANCH[me.branch]], ['Member since', fmtDate(me.createdAt)]];
 view.innerHTML = `
   <div class="list reveal" style="max-width:640px;--d:.1s">
     ${rows.map(([k, v]) => `<div class="row liquid-glass"><div class="grow muted">${k}</div><div>${esc(v || '-')}</div></div>`).join('')}

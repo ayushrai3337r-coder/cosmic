@@ -6,7 +6,8 @@ const statements = [
   `create table if not exists users (
     id serial primary key,
     firebase_uid text unique not null,
-    phone text unique not null,
+    email text,
+    phone text,
     first_name text not null,
     last_name text not null default '',
     board text not null default 'msbte',
@@ -15,6 +16,9 @@ const statements = [
     session_at timestamptz,
     created_at timestamptz not null default now()
   )`,
+  `alter table users add column if not exists email text`,
+  `alter table users alter column phone drop not null`,
+  `create unique index if not exists users_email on users (email)`,
   `create index if not exists users_session on users (session_hash)`,
   `create table if not exists notes (
     id serial primary key,

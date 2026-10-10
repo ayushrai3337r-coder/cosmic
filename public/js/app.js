@@ -103,7 +103,7 @@ export async function requireUser() {
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   set('sf-av', (u.firstName || 'S')[0].toUpperCase());
   set('sf-name', (u.firstName + ' ' + u.lastName).trim());
-  set('sf-phone', u.phone);
+  set('sf-phone', u.email || u.phone || '');
   return u;
 }
 
@@ -116,3 +116,53 @@ document.addEventListener('pointermove', e => {
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+export async function uploadShot(orderId, file) {
+  const sign = await api('/api/orders/' + orderId + '/shot-sign', {});
+  const pid = await cloudUpload(file, sign);
+  await api('/api/orders/' + orderId + '/shot', { publicId: pid });
+}
+
+export function payModal(onDone) {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal" id="pm"><div class="box liquid-glass-strong" style="max-height:92vh;overflow:auto">
+      <div class="eyebrow">Scan and pay</div>
+      <h3 id="pm-t"></h3>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:4px 0 14px">
+        <img src="/pay-qr.png" alt="UPI QR code" style="width:170px;height:170px;border-radius:1rem;background:#fff;padding:8px;object-fit:contain">
+        <div><div class="muted">Pay exactly</div><div class="price" id="pm-a"></div><div class="muted" style="margin-top:6px" id="pm-o"></div></div>
+      </div>
+      <p class="muted">Scan with GPay, PhonePe, Paytm or any UPI app and pay the amount shown. Then upload the payment screenshot below. Your notes unlock after approval.</p>
+      <label class="field" style="margin-top:16px"><span>Payment screenshot</span><input class="input" type="file" accept="image/*" id="pm-f"></label>
+      <div class="acts"><button class="btn white hoverable" id="pm-s">Submit screenshot</button><button class="btn liquid-glass hoverable" id="pm-x">Pay later</button></div>
+    </div></div>`);
+  const $ = id => document.getElementById(id);
+  let cur = null;
+  $('pm-x').onclick = () => $('pm').classList.remove('open');
+  $('pm-s').onclick = async () => {
+    const file = $('pm-f').files[0];
+    if (!file) return toast('Choose your payment screenshot first');
+    if (file.size > 8 * 1024 * 1024) return toast('Image is over 8 MB');
+    const b = $('pm-s');
+    b.disabled = true;
+    b.textContent = 'Uploading...';
+    try {
+      await uploadShot(cur.id, file);
+      toast('Screenshot sent for review');
+      $('pm').classList.remove('open');
+      if (onDone) await onDone();
+    } catch (e) { toast(e.message); }
+    b.disabled = false;
+    b.textContent = 'Submit screenshot';
+  };
+  return {
+    open(o) {
+      cur = o;
+      $('pm-t').textContent = o.title;
+      $('pm-a').textContent = 'Rs ' + o.amount;
+      $('pm-o').textContent = 'Order #' + o.id;
+      $('pm-f').value = '';
+      $('pm').classList.add('open');
+    }
+  };
+}

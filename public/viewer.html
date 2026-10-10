@@ -23,21 +23,48 @@
 import { mountBg, requireUser, api } from '/js/app.js';
 mountBg();
 const $ = id => document.getElementById(id);
+let fileUrl = null;
+
+function fail(msg) {
+  const s = $('state');
+  s.hidden = false;
+  s.textContent = 'Could not open these notes.';
+  const m = document.createElement('div');
+  m.className = 'muted';
+  m.style.marginTop = '12px';
+  m.textContent = String(msg).replace(/https?:\/\/\S+/g, '(link)').slice(0, 220);
+  s.appendChild(m);
+  if (fileUrl) {
+    const w = document.createElement('div');
+    w.style.marginTop = '22px';
+    const a = document.createElement('a');
+    a.className = 'btn liquid-glass-strong hoverable sm';
+    a.href = fileUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Open PDF in new tab';
+    w.appendChild(a);
+    s.appendChild(w);
+  }
+}
+
 try {
   const me = await requireUser();
   const id = new URLSearchParams(location.search).get('id');
   const f = await api('/api/notes/' + encodeURIComponent(id) + '/file');
+  fileUrl = f.url;
   $('t').textContent = f.title;
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const pdf = await pdfjsLib.getDocument(f.url).promise;
-  $('state').remove();
+  $('state').hidden = true;
   const width = Math.min(window.innerWidth - 24, 900), dpr = window.devicePixelRatio || 1;
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const base = page.getViewport({ scale: 1 });
     const vp = page.getViewport({ scale: (width / base.width) * dpr });
     const c = document.createElement('canvas');
-    c.width = vp.width; c.height = vp.height;
+    c.width = vp.width;
+    c.height = vp.height;
     c.style.width = width + 'px';
     c.oncontextmenu = e => e.preventDefault();
     $('pages').appendChild(c);
@@ -50,12 +77,10 @@ try {
     ctx.translate(c.width / 2, c.height / 2);
     ctx.rotate(-0.5);
     ctx.textAlign = 'center';
-    ctx.fillText(me.phone, 0, 0);
+    ctx.fillText(me.email || me.phone || '', 0, 0);
     ctx.restore();
   }
-} catch (e) {
-  $('state').textContent = e.message && e.message.length < 90 ? e.message : 'Could not open these notes. Check that they are unlocked.';
-}
+} catch (e) { fail(e.message || e); }
 </script>
 </body>
 </html>
