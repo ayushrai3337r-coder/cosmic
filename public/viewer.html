@@ -7,15 +7,20 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/glass.css">
 <style>
+html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .vbar{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:20;display:flex;align-items:center;gap:14px;padding:8px 8px 8px 20px;border-radius:9999px}
 .vbar strong{flex:1;font-weight:500;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pages{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;gap:12px;padding:84px 12px 40px}
-#pages canvas{border-radius:12px;background:#fff;max-width:100%}
+#pages canvas{border-radius:12px;background:#fff;max-width:100%;pointer-events:none}
 .state{position:relative;z-index:10;text-align:center;padding:140px 24px;color:rgba(255,255,255,.7)}
+.shield{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:#000;color:rgba(255,255,255,.6);font-size:.9rem;text-align:center;padding:24px}
+body.hide .shield{display:flex}
+body.hide #pages{visibility:hidden}
+@media print{body{display:none!important}}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
+<div class="shield">Notes are hidden while this window is not in focus.</div>
 <div class="vbar liquid-glass-strong"><strong id="t">Loading notes</strong><a class="btn liquid-glass hoverable sm" href="/dashboard">Back</a></div>
 <div id="state" class="state">Opening your notes...</div>
 <div id="pages"></div>
@@ -23,64 +28,80 @@
 import { mountBg, requireUser, api } from '/js/app.js';
 mountBg();
 const $ = id => document.getElementById(id);
-let fileUrl = null;
 
-function fail(msg) {
-  const s = $('state');
-  s.hidden = false;
-  s.textContent = 'Could not open these notes.';
-  const m = document.createElement('div');
-  m.className = 'muted';
-  m.style.marginTop = '12px';
-  m.textContent = String(msg).replace(/https?:\/\/\S+/g, '(link)').slice(0, 220);
-  s.appendChild(m);
-  if (fileUrl) {
-    const w = document.createElement('div');
-    w.style.marginTop = '22px';
-    const a = document.createElement('a');
-    a.className = 'btn liquid-glass-strong hoverable sm';
-    a.href = fileUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.textContent = 'Open PDF in new tab';
-    w.appendChild(a);
-    s.appendChild(w);
+const hideNow = () => document.body.classList.add('hide');
+const showNow = () => document.body.classList.remove('hide');
+document.addEventListener('visibilitychange', () => (document.hidden ? hideNow() : showNow()));
+window.addEventListener('blur', hideNow);
+window.addEventListener('focus', showNow);
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dragstart', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && ['p', 's', 'c', 'u'].includes(e.key.toLowerCase())) e.preventDefault();
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'PrintScreen') {
+    if (navigator.clipboard) navigator.clipboard.writeText('').catch(() => {});
+    hideNow();
+    setTimeout(showNow, 1500);
   }
+});
+
+function loadImg(url) {
+  return new Promise((ok, no) => {
+    const i = new Image();
+    i.onload = () => ok(i);
+    i.onerror = () => no(new Error('A page could not be loaded. Check your internet and try again.'));
+    i.src = url;
+  });
+}
+
+function watermark(ctx, w, h, text, dpr) {
+  ctx.save();
+  ctx.globalAlpha = 0.09;
+  ctx.fillStyle = '#000';
+  ctx.font = (15 * dpr) + 'px Poppins, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.rotate(-0.45);
+  const sx = 300 * dpr, sy = 150 * dpr;
+  for (let y = -h, r = 0; y < h * 2; y += sy, r++) {
+    for (let x = -w; x < w * 2; x += sx) ctx.fillText(text, x + (r % 2 ? sx / 2 : 0), y);
+  }
+  ctx.restore();
 }
 
 try {
   const me = await requireUser();
   const id = new URLSearchParams(location.search).get('id');
   const f = await api('/api/notes/' + encodeURIComponent(id) + '/file');
-  fileUrl = f.url;
   $('t').textContent = f.title;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument(f.url).promise;
   $('state').hidden = true;
-  const width = Math.min(window.innerWidth - 24, 900), dpr = window.devicePixelRatio || 1;
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const base = page.getViewport({ scale: 1 });
-    const vp = page.getViewport({ scale: (width / base.width) * dpr });
+  const mark = (me.email || me.phone || 'cosmic') + '  #' + me.id;
+  const width = Math.min(window.innerWidth - 24, 900);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for (const url of f.pages) {
+    const img = await loadImg(url);
+    const h = Math.round(width * img.naturalHeight / img.naturalWidth);
     const c = document.createElement('canvas');
-    c.width = vp.width;
-    c.height = vp.height;
+    c.width = Math.round(width * dpr);
+    c.height = Math.round(h * dpr);
     c.style.width = width + 'px';
-    c.oncontextmenu = e => e.preventDefault();
-    $('pages').appendChild(c);
+    c.style.height = h + 'px';
     const ctx = c.getContext('2d');
-    await page.render({ canvasContext: ctx, viewport: vp }).promise;
-    ctx.save();
-    ctx.globalAlpha = 0.07;
-    ctx.fillStyle = '#000';
-    ctx.font = (28 * dpr) + 'px Poppins, sans-serif';
-    ctx.translate(c.width / 2, c.height / 2);
-    ctx.rotate(-0.5);
-    ctx.textAlign = 'center';
-    ctx.fillText(me.email || me.phone || '', 0, 0);
-    ctx.restore();
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    watermark(ctx, c.width, c.height, mark, dpr);
+    $('pages').appendChild(c);
   }
-} catch (e) { fail(e.message || e); }
+} catch (e) {
+  const s = $('state');
+  s.hidden = false;
+  s.textContent = 'Could not open these notes.';
+  const m = document.createElement('div');
+  m.className = 'muted';
+  m.style.marginTop = '12px';
+  m.textContent = String(e.message || e).slice(0, 200);
+  s.appendChild(m);
+}
 </script>
 </body>
 </html>

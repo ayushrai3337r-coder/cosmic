@@ -21,6 +21,7 @@ const clean = (v, n) => String(v || '').trim().slice(0, n);
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const pubUser = u => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, phone: u.phone, board: u.board, branch: u.branch, createdAt: u.created_at });
 const signedUrl = (pid, resource) => cloudinary.url(pid, { resource_type: resource, type: 'authenticated', sign_url: true, secure: true });
+const pageUrl = (pid, n) => cloudinary.url(pid, { resource_type: 'image', type: 'authenticated', sign_url: true, secure: true, page: n, format: 'jpg', width: 1400, crop: 'limit', quality: 'auto' });
 
 function signUpload(publicId, resource) {
   const params = { public_id: publicId, timestamp: Math.round(Date.now() / 1000), type: 'authenticated' };
@@ -140,9 +141,12 @@ app.get('/api/notes/:id/file', auth, wrap(async (req, res) => {
   const id = parseInt(req.params.id) || 0;
   const paid = await sql`select 1 from orders where user_id = ${req.user.id} and note_id = ${id} and status = 'approved'`;
   if (!paid[0]) return res.status(403).json({ error: 'Not unlocked yet' });
-  const n = (await sql`select title, pdf_public_id from notes where id = ${id}`)[0];
+  const n = (await sql`select title, pdf_public_id, pages from notes where id = ${id}`)[0];
   if (!n) return res.status(404).json({ error: 'Notes not found' });
-  res.json({ url: signedUrl(n.pdf_public_id, 'raw'), title: n.title });
+  if (!n.pages) return res.status(409).json({ error: 'These notes need to be uploaded again by the admin.' });
+  const pages = [];
+  for (let i = 1; i <= n.pages; i++) pages.push(pageUrl(n.pdf_public_id, i));
+  res.json({ title: n.title, pages });
 }));
 
 /* ---------- admin ---------- */
@@ -159,7 +163,7 @@ app.get('/api/admin/data', adminOnly, wrap(async (req, res) => {
     sql`select o.id, o.amount, o.status, o.created_at as "createdAt", o.shot_public_id,
           u.first_name || ' ' || u.last_name as "userName", coalesce(u.email, u.phone) as phone, n.title
         from orders o join users u on u.id = o.user_id join notes n on n.id = o.note_id order by o.created_at desc`,
-    sql`select id, title, board, branch, semester, subject_code as "subjectCode", price, active, created_at as "createdAt" from notes order by created_at desc`,
+    sql`select id, title, board, branch, semester, subject_code as "subjectCode", price, pages, active, created_at as "createdAt" from notes order by created_at desc`,
     sql`select u.id, u.first_name || ' ' || u.last_name as name, coalesce(u.email, u.phone) as phone, u.board, u.branch, u.created_at as "createdAt",
           (select count(*)::int from orders o where o.user_id = u.id and o.status = 'approved') as unlocked
         from users u order by u.created_at desc`
@@ -178,15 +182,20 @@ app.post('/api/admin/orders/:id', adminOnly, wrap(async (req, res) => {
 }));
 
 app.post('/api/admin/sign', adminOnly, (req, res) =>
-  res.json(signUpload('cosmic/notes/' + Date.now() + '_' + crypto.randomBytes(4).toString('hex') + '.pdf', 'raw')));
+  res.json(signUpload('cosmic/notes/' + Date.now() + '_' + crypto.randomBytes(4).toString('hex'), 'image')));
 
 app.post('/api/admin/notes', adminOnly, wrap(async (req, res) => {
   const b = req.body, price = Math.round(Number(b.price)), pid = String(b.pdfPublicId || '');
   if (!clean(b.title, 120) || !(price >= 0) || !pid.startsWith('cosmic/notes/')) return res.status(400).json({ error: 'Missing fields' });
-  const r = await sql`insert into notes (title, description, board, branch, semester, subject_code, price, pdf_public_id)
+  let info;
+  try { info = await cloudinary.api.resource(pid, { resource_type: 'image', type: 'authenticated', pages: true }); }
+  catch (e) { return res.status(400).json({ error: 'Cloudinary could not find the uploaded PDF' }); }
+  const pages = Number(info.pages) || 0;
+  if (pages < 1) return res.status(400).json({ error: 'Could not read the pages of this PDF' });
+  const r = await sql`insert into notes (title, description, board, branch, semester, subject_code, price, pdf_public_id, pages)
     values (${clean(b.title, 120)}, ${clean(b.description, 400)}, ${b.board === 'ssc' ? 'ssc' : 'msbte'}, ${clean(b.branch, 30)},
-      ${clean(b.semester, 10)}, ${clean(b.subjectCode, 20)}, ${price}, ${pid}) returning id`;
-  res.json({ id: r[0].id });
+      ${clean(b.semester, 10)}, ${clean(b.subjectCode, 20)}, ${price}, ${pid}, ${pages}) returning id`;
+  res.json({ id: r[0].id, pages });
 }));
 
 app.post('/api/admin/notes/:id/toggle', adminOnly, wrap(async (req, res) => {
@@ -197,7 +206,10 @@ app.post('/api/admin/notes/:id/toggle', adminOnly, wrap(async (req, res) => {
 app.delete('/api/admin/notes/:id', adminOnly, wrap(async (req, res) => {
   const id = parseInt(req.params.id) || 0;
   const n = (await sql`select pdf_public_id from notes where id = ${id}`)[0];
-  if (n) await cloudinary.uploader.destroy(n.pdf_public_id, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+  if (n) {
+    await cloudinary.uploader.destroy(n.pdf_public_id, { resource_type: 'image', type: 'authenticated' }).catch(() => {});
+    await cloudinary.uploader.destroy(n.pdf_public_id, { resource_type: 'raw', type: 'authenticated' }).catch(() => {});
+  }
   await sql`delete from notes where id = ${id}`;
   res.json({ ok: true });
 }));

@@ -7,6 +7,12 @@
 <title>Cosmic - Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/glass.css">
+<style>
+.bars{display:flex;align-items:flex-end;gap:6px;height:150px;margin-top:14px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:6px}
+.bar i{display:block;width:100%;min-height:3px;border-radius:6px;background:rgba(255,255,255,.75)}
+.bar span{font-size:.62rem;color:rgba(255,255,255,.5)}
+</style>
 </head>
 <body>
 <main class="auth" id="gate">
@@ -25,6 +31,7 @@
     <div class="page-head"><div class="eyebrow">Cosmic admin</div><h1>Control <em>room</em></h1></div>
     <div class="chips" id="tabs">
       <button class="chip liquid-glass hoverable" data-t="orders">Orders</button>
+      <button class="chip liquid-glass hoverable" data-t="sales">Sales</button>
       <button class="chip liquid-glass hoverable" data-t="upload">Upload</button>
       <button class="chip liquid-glass hoverable" data-t="notes">Notes</button>
       <button class="chip liquid-glass hoverable" data-t="users">Users</button>
@@ -59,13 +66,14 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('in').click(
 if (sessionStorage.getItem('at')) load();
 
 const stat = (l, n) => `<div class="card stat liquid-glass"><div class="label">${l}</div><div class="num">${n}</div></div>`;
+const rs = n => 'Rs ' + Number(n || 0).toLocaleString('en-IN');
 
 function ordersView() {
   const list = D.orders.filter(o => (filt === 'all' || o.status === filt) && (!q || [o.userName, o.phone, o.title].join(' ').toLowerCase().includes(q)));
   const c = s => D.orders.filter(o => o.status === s).length;
   return `
     <div class="grid g-stats">${stat('Orders', D.orders.length)}${stat('Pending', c('pending'))}${stat('Approved', c('approved'))}${stat('Users', D.users.length)}</div>
-    <input class="input" id="q" placeholder="Search name, phone or notes" value="${esc(q)}" style="margin:20px 0 14px">
+    <input class="input" id="q" placeholder="Search name, email or notes" value="${esc(q)}" style="margin:20px 0 14px">
     <div class="chips">${['all', 'pending', 'approved', 'rejected'].map(s => `<button class="chip liquid-glass hoverable ${filt === s ? 'on' : ''}" data-f="${s}">${s}</button>`).join('')}</div>
     <div class="list">${list.map(o => `
       <div class="row liquid-glass">
@@ -75,6 +83,45 @@ function ordersView() {
         ${tag(o.status)}
         <div class="acts">${['approved', 'rejected', 'pending'].filter(s => s !== o.status).map(s => `<button class="btn liquid-glass hoverable sm" data-o="${o.id}" data-s="${s}">${s === 'approved' ? 'Approve' : s === 'rejected' ? 'Reject' : 'Reset'}</button>`).join('')}</div>
       </div>`).join('') || '<div class="empty">No orders found</div>'}</div>`;
+}
+
+function salesView() {
+  const ok = D.orders.filter(o => o.status === 'approved');
+  const sum = a => a.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+  const now = new Date();
+  const dayKey = d => new Date(d).toDateString();
+  const today = ok.filter(o => dayKey(o.createdAt) === now.toDateString());
+  const month = ok.filter(o => { const d = new Date(o.createdAt); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+  const pending = D.orders.filter(o => o.status === 'pending');
+
+  const per = {};
+  ok.forEach(o => { const p = per[o.title] || (per[o.title] = { title: o.title, units: 0, total: 0 }); p.units++; p.total += Number(o.amount) || 0; });
+  const rows = Object.values(per).sort((a, b) => b.total - a.total);
+
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    days.push({ label: d.getDate(), total: sum(ok.filter(o => dayKey(o.createdAt) === d.toDateString())) });
+  }
+  const max = Math.max(1, ...days.map(d => d.total));
+  const recent = ok.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 8);
+
+  return `
+    <div class="grid g-stats">
+      ${stat('Total sales', rs(sum(ok)))}${stat('Notes sold', ok.length)}${stat('Today', rs(sum(today)))}${stat('This month', rs(sum(month)))}
+      ${stat('Pending value', rs(sum(pending)))}${stat('Average sale', ok.length ? rs(Math.round(sum(ok) / ok.length)) : 'Rs 0')}
+    </div>
+    <div class="card liquid-glass" style="margin-top:14px">
+      <div class="eyebrow">Last 14 days (by order date)</div>
+      <div class="bars">${days.map(d => `<div class="bar" title="${rs(d.total)}"><i style="height:${Math.round(d.total / max * 100)}%"></i><span>${d.label}</span></div>`).join('')}</div>
+    </div>
+    <div class="sec"><h2>Sales per <em>notes</em></h2></div>
+    <div class="list">${rows.map(r => `
+      <div class="row liquid-glass"><div class="grow"><h3>${esc(r.title)}</h3><div class="muted">${r.units} sold</div></div><div class="price">${rs(r.total)}</div></div>`).join('') || '<div class="empty">No approved sales yet</div>'}</div>
+    <div class="sec"><h2>Recent sales</h2></div>
+    <div class="list">${recent.map(o => `
+      <div class="row liquid-glass"><div class="grow"><h3>${esc(o.title)}</h3><div class="muted">${esc(o.userName)} &middot; ${fmtDate(o.createdAt)}</div></div><div class="price">${rs(o.amount)}</div></div>`).join('') || '<div class="empty">No approved sales yet</div>'}</div>`;
 }
 
 function uploadView() {
@@ -91,7 +138,7 @@ function uploadView() {
         <label class="field"><span>Subject code</span><input class="input" id="u-code" placeholder="22213"></label>
       </div>
       <label class="field"><span>Description</span><textarea class="input" id="u-desc" placeholder="What is inside these notes"></textarea></label>
-      <label class="field"><span>PDF file</span><input class="input" id="u-file" type="file" accept="application/pdf"></label>
+      <label class="field"><span>PDF file (max 10 MB)</span><input class="input" id="u-file" type="file" accept="application/pdf"></label>
       <button class="btn liquid-glass-strong hoverable" id="up-go">${icon('upload')}Upload and publish</button>
     </div>`;
 }
@@ -99,7 +146,7 @@ function uploadView() {
 function notesView() {
   return `<div class="list">${D.notes.map(n => `
     <div class="row liquid-glass">
-      <div class="grow"><h3>${esc(n.title)}</h3><div class="muted">${n.board === 'ssc' ? 'SSC' : 'MSBTE'} &middot; ${esc(BRANCH[n.branch] || n.branch)} &middot; Sem ${esc(n.semester)}</div></div>
+      <div class="grow"><h3>${esc(n.title)}</h3><div class="muted">${n.board === 'ssc' ? 'SSC' : 'MSBTE'} &middot; ${esc(BRANCH[n.branch] || n.branch)} &middot; Sem ${esc(n.semester)} &middot; ${n.pages ? n.pages + ' pages' : 'Re-upload needed'}</div></div>
       <div class="price">Rs ${n.price}</div>
       <span class="tag ${n.active ? 'ok' : 'no'}">${n.active ? 'Live' : 'Hidden'}</span>
       <div class="acts">
@@ -121,7 +168,7 @@ function usersView() {
 
 function draw() {
   document.querySelectorAll('#tabs .chip').forEach(c => c.classList.toggle('on', c.dataset.t === tab));
-  $('v').innerHTML = { orders: ordersView, upload: uploadView, notes: notesView, users: usersView }[tab]();
+  $('v').innerHTML = { orders: ordersView, sales: salesView, upload: uploadView, notes: notesView, users: usersView }[tab]();
   const s = $('q');
   if (s && q) { s.focus(); s.setSelectionRange(q.length, q.length); }
 }
@@ -155,18 +202,21 @@ $('v').addEventListener('click', async e => {
       const file = $('u-file').files[0], title = $('u-title').value.trim(), price = $('u-price').value;
       if (!title || price === '' || !file) return toast('Title, price and a PDF are required');
       if (file.type !== 'application/pdf') return toast('Only PDF files are allowed');
+      if (file.size > 10 * 1024 * 1024) return toast('This PDF is over 10 MB. Compress it first.');
       up.disabled = true;
       toast('Uploading, please wait');
-      const sign = await api('/api/admin/sign', {}, A);
-      const pdfPublicId = await cloudUpload(file, sign);
-      await api('/api/admin/notes', {
-        title, price, pdfPublicId,
-        board: $('u-board').value, branch: $('u-branch').value, semester: $('u-sem').value,
-        subjectCode: $('u-code').value.trim(), description: $('u-desc').value.trim()
-      }, A);
-      toast('Notes published');
-      tab = 'notes';
-      await load();
+      try {
+        const sign = await api('/api/admin/sign', {}, A);
+        const pdfPublicId = await cloudUpload(file, sign);
+        const r = await api('/api/admin/notes', {
+          title, price, pdfPublicId,
+          board: $('u-board').value, branch: $('u-branch').value, semester: $('u-sem').value,
+          subjectCode: $('u-code').value.trim(), description: $('u-desc').value.trim()
+        }, A);
+        toast('Notes published with ' + r.pages + ' pages');
+        tab = 'notes';
+        await load();
+      } finally { up.disabled = false; }
     }
   } catch (err) { toast(err.message); draw(); }
 });
