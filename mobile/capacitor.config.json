@@ -1,0 +1,13 @@
+{
+  "appId": "com.cosmic.notes",
+  "appName": "Cosmic",
+  "webDir": "www",
+  "server": {
+    "url": "https://YOURSITE.vercel.app/login",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "appendUserAgent": "CosmicApp"
+  }
+}

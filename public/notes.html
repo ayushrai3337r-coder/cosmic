@@ -10,12 +10,10 @@
 <body>
 <script type="module">
 import { mountShell, requireUser, api, payModal, esc, toast, BRANCH } from '/js/app.js';
-const view = mountShell('notes', 'Library', 'Browse <em>notes</em>', 'Pick a subject, scan the QR to pay, and it unlocks once your payment is approved.');
-await requireUser();
-let notes;
-try { notes = await api('/api/notes'); }
-catch (e) { view.innerHTML = '<div class="empty">Could not load notes: ' + esc(e.message) + '</div>'; throw e; }
-let board = 'all', q = '';
+const view = mountShell('notes', 'Library', 'Browse <em>notes</em>', 'Pick a subject, pay with your UPI app, and it unlocks once your payment is confirmed.');
+const [, loaded] = await Promise.all([requireUser(), api('/api/notes').catch(e => e)]);
+if (loaded instanceof Error) { view.innerHTML = '<div class="empty">Could not load notes: ' + esc(loaded.message) + '</div>'; throw loaded; }
+let notes = loaded, board = 'all', q = '';
 const $ = id => document.getElementById(id);
 
 view.innerHTML = `
@@ -31,21 +29,23 @@ view.innerHTML = `
 
 const pay = payModal(async () => { notes = await api('/api/notes'); draw(); });
 
+function button(n) {
+  if (n.status === 'approved') return `<a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${n.id}">Open</a>`;
+  if (n.status === 'pending' && n.hasShot) return '<span class="btn liquid-glass sm dim">Checking payment</span>';
+  if (n.status === 'pending') return `<button class="btn liquid-glass-strong hoverable sm" data-buy="${n.id}">Complete payment</button>`;
+  return `<button class="btn liquid-glass-strong hoverable sm" data-buy="${n.id}">${n.price === 0 ? 'Get free' : 'Buy now'}</button>`;
+}
+
 function draw() {
   const list = notes.filter(n => (board === 'all' || n.board === board) && (!q || [n.title, n.branch, n.subjectCode].join(' ').toLowerCase().includes(q)));
-  $('grid').innerHTML = list.map(n => {
-    const btn = n.status === 'approved' ? `<a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${n.id}">Open</a>`
-      : n.status === 'pending' ? `<button class="btn liquid-glass-strong hoverable sm" data-pay="${n.id}">Pay or upload</button>`
-      : `<button class="btn liquid-glass-strong hoverable sm" data-buy="${n.id}">${n.price === 0 ? 'Get free' : 'Buy now'}</button>`;
-    return `
+  $('grid').innerHTML = list.map(n => `
       <div class="card liquid-glass">
         <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">${n.board === 'ssc' ? 'SSC' : 'MSBTE'}</span><span class="muted">Sem ${esc(n.semester)}</span></div>
         <h3 style="margin:14px 0 6px">${esc(n.title)}</h3>
         <div class="muted">${esc(BRANCH[n.branch] || n.branch)}${n.subjectCode ? ' &middot; ' + esc(n.subjectCode) : ''}</div>
         <p class="muted" style="margin-top:8px">${esc(n.description)}</p>
-        <div class="foot"><div class="price">${n.price === 0 ? 'Free' : 'Rs ' + n.price}</div>${btn}</div>
-      </div>`;
-  }).join('') || '<div class="empty" style="grid-column:1/-1">No notes found</div>';
+        <div class="foot"><div class="price">${n.price === 0 ? 'Free' : 'Rs ' + n.price}</div>${button(n)}</div>
+      </div>`).join('') || '<div class="empty" style="grid-column:1/-1">No notes found</div>';
 }
 draw();
 
@@ -59,16 +59,17 @@ view.querySelector('.chips').addEventListener('click', e => {
 });
 
 $('grid').addEventListener('click', async e => {
-  const b = e.target.closest('[data-buy], [data-pay]');
+  const b = e.target.closest('[data-buy]');
   if (!b) return;
   b.disabled = true;
   try {
-    const n = notes.find(x => x.id === Number(b.dataset.buy || b.dataset.pay));
+    const n = notes.find(x => x.id === Number(b.dataset.buy));
     const r = await api('/api/orders', { noteId: n.id });
     n.status = r.status;
     if (r.status === 'approved') { toast('Unlocked. Open it from your dashboard.'); draw(); return; }
-    pay.open({ id: r.id, title: n.title, amount: r.amount });
+    n.hasShot = false;
     draw();
+    pay.open({ id: r.id, title: n.title, amount: r.amount });
   } catch (err) { toast(err.message); b.disabled = false; }
 });
 </script>
