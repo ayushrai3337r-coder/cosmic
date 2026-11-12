@@ -1,13 +1,15 @@
 {
-  "appId": "com.cosmic.notes",
-  "appName": "Cosmic",
+  "appId": "com.aracademy.app",
+  "appName": "AR Academy",
   "webDir": "www",
+  "backgroundColor": "#000000",
   "server": {
-    "url": "https://cosmic-sale.vercel.app/login",
+    "url": "https://cosmic-sale.vercel.app/intro",
     "androidScheme": "https",
     "cleartext": false
   },
   "android": {
-    "appendUserAgent": "CosmicApp"
+    "appendUserAgent": "CosmicApp",
+    "backgroundColor": "#000000"
   }
 }

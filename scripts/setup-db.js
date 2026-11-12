@@ -19,6 +19,8 @@ const statements = [
   )`,
   `alter table users add column if not exists email text`,
   `alter table users add column if not exists device_id text`,
+  `alter table users add column if not exists medium text not null default ''`,
+  `alter table users add column if not exists onboarded boolean not null default true`,
   `alter table users alter column phone drop not null`,
   `create unique index if not exists users_email on users (email)`,
   `create index if not exists users_session on users (session_hash)`,
@@ -37,6 +39,7 @@ const statements = [
     created_at timestamptz not null default now()
   )`,
   `alter table notes add column if not exists pages int not null default 0`,
+  `alter table notes add column if not exists medium text not null default ''`,
   `create index if not exists notes_active on notes (active, created_at desc)`,
   `create table if not exists orders (
     id serial primary key,

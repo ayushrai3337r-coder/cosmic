@@ -5,4 +5,4 @@ const dev = express();
 dev.use(express.static('public', { extensions: ['html'] }));
 dev.use(app);
 const port = process.env.PORT || 3000;
-dev.listen(port, () => console.log('Cosmic running on http://localhost:' + port));
+dev.listen(port, () => console.log('AR Academy running on http://localhost:' + port));

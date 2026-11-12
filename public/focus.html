@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/apple-touch.png">
+<title>AR Academy - Focus</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<script type="module">
+import { mountShell, requireUser, toast, study, pref, esc } from '/js/app.js';
+const view = mountShell('focus', 'Study tools', 'Focus <em>zone</em>', 'Set a timer, put the phone down and study. Every minute is counted.');
+await requireUser();
+const $ = id => document.getElementById(id);
+const MODES = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+const PRESETS = [[25, 5, 15], [45, 10, 20], [50, 10, 20], [15, 3, 10]];
+const QUOTES = ['Small steps every day beat one big night.', 'Phone down. Notes open. You got this.', 'Future you is watching. Make them proud.', 'Do not stop when tired. Stop when done.', 'One chapter now saves one hour in the exam hall.'];
+let S = pref.get('timer', { preset: 0, mode: 'focus', end: 0, left: 0, running: false, done: 0, goal: 120, custom: 30 });
+const mins = () => (S.preset === 4 ? S.custom : PRESETS[S.preset][S.mode === 'focus' ? 0 : S.mode === 'short' ? 1 : 2]);
+if (!S.left) S.left = mins() * 60;
+const save = () => pref.set('timer', S);
+let wake = null, tick = null, away = 0;
+
+view.innerHTML = `
+  <div class="focus-grid">
+    <div class="card liquid-glass timer-card reveal" style="--d:.1s">
+      <div class="chips center" id="modes">${Object.keys(MODES).map(k => `<button class="chip liquid-glass hoverable" data-m="${k}">${MODES[k]}</button>`).join('')}</div>
+      <div class="ring" id="ring"><svg viewBox="0 0 220 220"><circle cx="110" cy="110" r="100" class="trk"/><circle cx="110" cy="110" r="100" class="bar" id="arc"/></svg><div class="time"><b id="clock">25:00</b><span id="state">Ready</span></div></div>
+      <div class="ctl"><button class="btn liquid-glass hoverable" id="reset" aria-label="Reset">Reset</button><button class="btn white hoverable big" id="go">Start</button><button class="btn liquid-glass hoverable" id="full">Focus mode</button></div>
+      <div class="chips center" id="presets" style="margin:20px 0 0">${PRESETS.map((p, i) => `<button class="chip liquid-glass hoverable" data-p="${i}">${p[0]} / ${p[1]}</button>`).join('')}<button class="chip liquid-glass hoverable" data-p="4">Custom</button></div>
+      <label class="field custom" id="cu" hidden><span>Custom focus minutes</span><input class="input" id="cv" type="number" min="1" max="180" inputmode="numeric"></label>
+    </div>
+    <div class="side-col">
+      <div class="card liquid-glass reveal" style="--d:.2s"><div class="eyebrow">Today</div>
+        <div class="big-num"><b id="tm">0</b><span>min studied</span></div>
+        <div class="goal"><i id="gb"></i></div>
+        <div class="goal-row"><span class="muted">Daily goal</span><span class="stepper"><button id="gm" aria-label="Less">-</button><b id="gv"></b><button id="gp" aria-label="More">+</button></span></div>
+        <div class="two-stat"><div><b id="st">0</b><span>day streak</span></div><div><b id="ss">0</b><span>sessions</span></div></div>
+      </div>
+      <div class="card liquid-glass reveal" style="--d:.3s"><div class="eyebrow">This week</div><div class="bars wk" id="wk"></div></div>
+      <div class="card liquid-glass reveal" style="--d:.4s"><div class="eyebrow">Exam countdown</div>
+        <div id="cd"></div>
+        <div class="two" style="margin-top:12px"><input class="input" id="en" placeholder="Exam name" maxlength="30"><input class="input" id="ed" type="date"></div>
+      </div>
+    </div>
+  </div>
+  <div class="immerse" id="im" hidden>
+    <button class="x btn liquid-glass hoverable sm" id="ex">Exit</button>
+    <div class="q" id="qt"></div><div class="big-clock" id="bc">25:00</div><div class="muted" id="bs"></div>
+    <div class="ctl"><button class="btn white hoverable big" id="bg">Pause</button></div>
+  </div>`;
+
+const R = 2 * Math.PI * 100;
+$('arc').style.strokeDasharray = R;
+const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+function left() { return S.running ? Math.max(0, Math.round((S.end - Date.now()) / 1000)) : S.left; }
+function draw() {
+  const l = left(), tot = mins() * 60;
+  $('clock').textContent = $('bc').textContent = fmt(l);
+  $('arc').style.strokeDashoffset = R * (1 - l / tot);
+  $('state').textContent = $('bs').textContent = S.running ? (S.mode === 'focus' ? 'Stay with it' : 'Rest a little') : (l < tot ? 'Paused' : 'Ready');
+  $('go').textContent = $('bg').textContent = S.running ? 'Pause' : (l < tot ? 'Resume' : 'Start');
+  document.title = (S.running ? fmt(l) + ' - ' : '') + 'AR Academy - Focus';
+  $('modes').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.m === S.mode));
+  $('presets').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', Number(c.dataset.p) === S.preset));
+  $('cu').hidden = S.preset !== 4;
+  const t = study.today();
+  $('tm').textContent = t; $('gv').textContent = S.goal + ' min';
+  $('gb').style.width = Math.min(100, t / S.goal * 100) + '%';
+  $('st').textContent = study.streak(); $('ss').textContent = S.done;
+  const w = study.week(), mx = Math.max(30, ...w.map(x => x.min));
+  $('wk').innerHTML = w.map(x => `<div class="bar" title="${x.min} min"><i style="height:${Math.max(3, x.min / mx * 100)}%"></i><span>${x.day}</span></div>`).join('');
+}
+function beep() {
+  try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(.2, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + 1.2); o.start(); o.stop(a.currentTime + 1.2); } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+}
+async function lockScreen(on) {
+  try { if (on && navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); else if (wake) { wake.release(); wake = null; } } catch (e) {}
+}
+function finish() {
+  clearInterval(tick);
+  const was = S.mode;
+  if (was === 'focus') { study.add(mins()); S.done++; toast('Great work! ' + mins() + ' minutes added.'); }
+  else toast('Break over. Ready when you are.');
+  S.mode = was === 'focus' ? (S.done % 4 === 0 ? 'long' : 'short') : 'focus';
+  S.running = false; S.left = mins() * 60; save(); lockScreen(false); beep(); draw();
+}
+function loop() { clearInterval(tick); tick = setInterval(() => { if (left() <= 0) finish(); else draw(); }, 500); }
+function start() { S.running = true; S.end = Date.now() + S.left * 1000; save(); lockScreen(true); loop(); draw(); }
+function pause() { S.left = left(); S.running = false; save(); clearInterval(tick); lockScreen(false); draw(); }
+const toggle = () => (S.running ? pause() : start());
+function reset() { pause(); S.left = mins() * 60; save(); draw(); }
+$('go').onclick = $('bg').onclick = toggle;
+$('reset').onclick = reset;
+$('modes').onclick = e => { const c = e.target.closest('[data-m]'); if (c) { S.mode = c.dataset.m; reset(); } };
+$('presets').onclick = e => { const c = e.target.closest('[data-p]'); if (c) { S.preset = Number(c.dataset.p); reset(); } };
+$('cv').value = S.custom;
+$('cv').onchange = () => { S.custom = Math.min(180, Math.max(1, Number($('cv').value) || 30)); reset(); };
+$('gm').onclick = () => { S.goal = Math.max(15, S.goal - 15); save(); draw(); };
+$('gp').onclick = () => { S.goal = Math.min(720, S.goal + 15); save(); draw(); };
+$('full').onclick = async () => {
+  $('im').hidden = false; $('qt').textContent = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) {}
+  if (!S.running) start();
+};
+$('ex').onclick = () => { $('im').hidden = true; try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {} };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && S.running && S.mode === 'focus' && !$('im').hidden) away++;
+  else if (!document.hidden) { if (S.running) { lockScreen(true); if (left() <= 0) finish(); } if (away) { toast('You left the screen ' + away + ' time' + (away > 1 ? 's' : '') + '. Stay focused!'); away = 0; } draw(); }
+});
+
+/* exam countdown */
+function cd() {
+  const x = pref.get('exam', null);
+  if (!x) { $('cd').innerHTML = '<div class="muted" style="margin-top:8px">Add your next exam to see the days left.</div>'; return; }
+  const d = Math.ceil((new Date(x.date + 'T00:00:00') - new Date()) / 864e5);
+  $('cd').innerHTML = `<div class="big-num"><b>${d > 0 ? d : 0}</b><span>${d > 0 ? 'days to ' + esc(x.name || 'exam') : d === 0 ? 'Exam is today. All the best!' : 'exam done'}</span></div>`;
+}
+const ex = pref.get('exam', null);
+if (ex) { $('en').value = ex.name || ''; $('ed').value = ex.date; }
+$('en').onchange = $('ed').onchange = () => { if ($('ed').value) pref.set('exam', { name: $('en').value.trim(), date: $('ed').value }); cd(); };
+cd(); draw();
+if (S.running) { if (left() <= 0) finish(); else { lockScreen(true); loop(); } }
+</script>
+</body>
+</html>

@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
-<title>Cosmic - Account</title>
+<title>AR Academy - Account</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/glass.css">
 </head>
 <body>
 <script type="module">
-import { mountShell, requireUser, api, clearToken, esc, fmtDate, toast, icon, BRANCH, BRANCH_PICK } from '/js/app.js';
+import { mountShell, requireUser, api, clearToken, esc, fmtDate, toast, icon, BRANCH, BRANCH_PICK, MEDIUM } from '/js/app.js';
 const view = mountShell('account', 'Account', 'Your <em>account</em>', 'Keep your board and branch updated so you see the right notes.');
 const me = await requireUser(true);
 const opts = BRANCH_PICK.map(k => `<option value="${k}" ${me.branch === k ? 'selected' : ''}>${BRANCH[k]}</option>`).join('');
@@ -24,6 +24,7 @@ view.innerHTML = `
       <select class="input" id="board"><option value="msbte" ${me.board === 'msbte' ? 'selected' : ''}>MSBTE Diploma</option><option value="ssc" ${me.board === 'ssc' ? 'selected' : ''}>SSC Maharashtra</option></select>
     </label>
     <label class="field" id="bf" ${me.board === 'ssc' ? 'hidden' : ''}><span>Branch</span><select class="input" id="branch">${opts}</select></label>
+    <label class="field" id="mf" ${me.board === 'ssc' ? '' : 'hidden'}><span>Medium</span><select class="input" id="medium">${Object.keys(MEDIUM).map(k => `<option value="${k}" ${(me.medium || 'en') === k ? 'selected' : ''}>${MEDIUM[k]}</option>`).join('')}</select></label>
     <button class="btn white hoverable" id="save">Save changes</button>
     <p class="muted" style="margin-top:16px">Member since ${fmtDate(me.createdAt)}. Your account works on one device only.</p>
   </div>
@@ -32,12 +33,12 @@ view.innerHTML = `
     <button class="btn liquid-glass-strong hoverable" id="out">${icon('logout')}Sign out</button>
   </div>`;
 const $ = id => document.getElementById(id);
-$('board').onchange = () => { $('bf').hidden = $('board').value === 'ssc'; };
+$('board').onchange = () => { const s = $('board').value === 'ssc'; $('bf').hidden = s; $('mf').hidden = !s; };
 $('save').onclick = async () => {
   const b = $('save');
   b.disabled = true;
   try {
-    await api('/api/me', { firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value }, { method: 'PATCH' });
+    await api('/api/me', { firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value, medium: $('medium').value }, { method: 'PATCH' });
     await requireUser(true);
     toast('Saved');
   } catch (e) { toast(e.message); }

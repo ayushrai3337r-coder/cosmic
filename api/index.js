@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { neon } from '@neondatabase/serverless';
 import { v2 as cloudinary } from 'cloudinary';
@@ -24,8 +26,9 @@ const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const bearer = req => (req.headers.authorization || '').replace(/^Bearer /, '');
 const clean = (v, n) => String(v || '').trim().slice(0, n);
+app.set('trust proxy', true);
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-const pubUser = u => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, phone: u.phone, board: u.board, branch: u.branch, createdAt: u.created_at });
+const pubUser = u => ({ id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, phone: u.phone, board: u.board, branch: u.branch, medium: u.medium || '', onboarded: u.onboarded !== false, createdAt: u.created_at });
 const signedUrl = (pid, resource) => cloudinary.url(pid, { resource_type: resource, type: 'authenticated', sign_url: true, secure: true });
 const pageUrl = (pid, n, w) => cloudinary.url(pid, { resource_type: 'image', type: 'authenticated', sign_url: true, secure: true, page: n, format: 'jpg', width: w, crop: 'limit', quality: 'auto' });
 
@@ -59,13 +62,10 @@ async function findOrCreate(g, p) {
   let u = (await sql`select * from users where firebase_uid = ${g.uid}`)[0];
   if (!u) u = (await sql`update users set firebase_uid = ${g.uid} where email = ${g.email} returning *`)[0];
   if (u) return { u };
-  if (!p) return { needs: { needsSignup: true, name: g.name, email: g.email } };
-  const first = clean(p.firstName, 40);
-  if (!first) return { err: [400, 'Enter your first name'] };
-  const board = p.board === 'ssc' ? 'ssc' : 'msbte';
-  const branch = board === 'ssc' ? 'ssc-general' : clean(p.branch, 30);
-  u = (await sql`insert into users (firebase_uid, email, first_name, last_name, board, branch)
-    values (${g.uid}, ${g.email}, ${first}, ${clean(p.lastName, 40)}, ${board}, ${branch})
+  const parts = (g.name || g.email.split('@')[0]).trim().split(/\s+/);
+  const first = clean(parts.shift() || 'Student', 40), last = clean(parts.join(' '), 40);
+  u = (await sql`insert into users (firebase_uid, email, first_name, last_name, board, branch, medium, onboarded)
+    values (${g.uid}, ${g.email}, ${first}, ${last}, 'msbte', '', '', false)
     on conflict (firebase_uid) do update set email = excluded.email returning *`)[0];
   return { u };
 }
@@ -82,7 +82,7 @@ async function startSession(u, dev, res) {
 const auth = wrap(async (req, res, next) => {
   const t = bearer(req);
   if (!t) return res.status(401).json({ error: 'Please sign in', code: 'SESSION' });
-  const u = (await sql`select id, email, phone, first_name, last_name, board, branch, created_at, session_at, device_id from users where session_hash = ${sha(t)}`)[0];
+  const u = (await sql`select id, email, phone, first_name, last_name, board, branch, medium, onboarded, created_at, session_at, device_id from users where session_hash = ${sha(t)}`)[0];
   if (!u) return res.status(401).json({ error: 'Your session ended. Please sign in again.', code: 'SESSION' });
   if (u.session_at && Date.now() - new Date(u.session_at).getTime() > SESSION_MS) return res.status(401).json({ error: 'Your session expired. Please sign in again.', code: 'SESSION' });
   if (u.device_id && String(req.headers['x-device'] || '') !== u.device_id) return res.status(401).json({ error: DEVICE_MSG, code: 'SESSION' });
@@ -95,11 +95,19 @@ const makeAdmin = () => { const exp = String(Date.now() + 8 * 3600 * 1000); retu
 const okAdmin = t => { if (SECRET.length < 16) return false; const [exp, sig] = String(t || '').split('.'); return !!exp && !!sig && Number(exp) > Date.now() && same(sig, adminSig(exp)); };
 const adminOnly = (req, res, next) => okAdmin(req.headers['x-admin-token']) ? next() : res.status(401).json({ error: 'Admin sign in required' });
 
+/* secret admin page: the address comes from ADMIN_PATH (example x-4827361905); without it a private one is derived from your secrets */
+const ADMIN_PATH = String(/^\/?x-\d{6,}$/.test(E.ADMIN_PATH || '') ? E.ADMIN_PATH : ('x-' + (BigInt('0x' + sha('admin-path|' + SECRET + '|' + (E.ADMIN_PASSWORD || '')).slice(0, 14)) % 10000000000n).toString().padStart(10, '0'))).replace(/^\/+/, '');
+app.get('/' + ADMIN_PATH, (req, res) => {
+  res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Content-Type': 'text/html; charset=utf-8' });
+  res.send(fs.readFileSync(path.join(process.cwd(), 'private', 'admin.html'), 'utf8'));
+});
+if (!E.VERCEL) console.log('Admin page: /' + ADMIN_PATH);
+
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.get('/api/config', (req, res) => res.json({
   apiKey: E.FIREBASE_API_KEY, authDomain: E.FIREBASE_AUTH_DOMAIN, projectId: E.FIREBASE_PROJECT_ID, appId: E.FIREBASE_APP_ID,
-  upiId: E.UPI_ID || '', payQr: E.PAY_QR || ''
+  upiId: E.UPI_ID || '', payQr: E.PAY_QR || '', googleWebClientId: E.GOOGLE_WEB_CLIENT_ID || '', supportEmail: E.SUPPORT_EMAIL || ''
 }));
 
 /* ---------- auth ---------- */
@@ -148,19 +156,24 @@ app.post('/api/auth/logout', auth, wrap(async (req, res) => {
 
 app.get('/api/me', auth, (req, res) => res.json(pubUser(req.user)));
 
+const MEDIUMS = ['en', 'mr', 'hi'];
 app.patch('/api/me', auth, wrap(async (req, res) => {
-  const b = req.body, first = clean(b.firstName, 40);
-  if (!first) return res.status(400).json({ error: 'First name is required' });
+  const b = req.body;
+  const first = clean(b.firstName, 40) || req.user.first_name;
+  const last = b.lastName === undefined ? req.user.last_name : clean(b.lastName, 40);
   const board = b.board === 'ssc' ? 'ssc' : 'msbte';
   const branch = board === 'ssc' ? 'ssc-general' : clean(b.branch, 30);
-  await sql`update users set first_name = ${first}, last_name = ${clean(b.lastName, 40)}, board = ${board}, branch = ${branch} where id = ${req.user.id}`;
+  const medium = board === 'ssc' ? (MEDIUMS.includes(b.medium) ? b.medium : 'en') : '';
+  if (board === 'msbte' && b.onboarded && !branch) return res.status(400).json({ error: 'Choose your branch' });
+  await sql`update users set first_name = ${first}, last_name = ${last}, board = ${board}, branch = ${branch}, medium = ${medium},
+    onboarded = ${b.onboarded === true ? true : req.user.onboarded !== false} where id = ${req.user.id}`;
   res.json({ ok: true });
 }));
 
 /* ---------- notes and orders ---------- */
 app.get('/api/notes', auth, wrap(async (req, res) => {
   res.json(await sql`
-    select n.id, n.title, n.description, n.board, n.branch, n.semester, n.subject_code as "subjectCode", n.price,
+    select n.id, n.title, n.description, n.board, n.branch, n.medium, n.semester, n.subject_code as "subjectCode", n.price,
       o.status, coalesce(o.has_shot, false) as "hasShot"
     from notes n
     left join lateral (
@@ -204,7 +217,7 @@ app.post('/api/orders/:id/shot', auth, wrap(async (req, res) => {
 
 app.get('/api/notes/:id/file', auth, limit('file', 40, 60000), wrap(async (req, res) => {
   if (E.APP_ONLY === '1' && !/CosmicApp/.test(req.headers['user-agent'] || '')) {
-    return res.status(403).json({ error: 'Please open your notes in the Cosmic app. You can download it from the home page.', code: 'APP' });
+    return res.status(403).json({ error: 'Please open your notes in the AR Academy app. You can download it from the home page.', code: 'APP' });
   }
   const id = parseInt(req.params.id) || 0;
   const paid = await sql`select 1 from orders where user_id = ${req.user.id} and note_id = ${id} and status = 'approved'`;
@@ -220,8 +233,9 @@ app.get('/api/notes/:id/file', auth, limit('file', 40, 60000), wrap(async (req, 
 
 /* ---------- admin ---------- */
 app.post('/api/admin/login', limit('admin', 8, 600000), wrap(async (req, res) => {
-  if (!E.ADMIN_PASSWORD || SECRET.length < 16) return res.status(503).json({ error: 'Admin is not configured on the server' });
-  if (!same(req.body.password || '', E.ADMIN_PASSWORD)) {
+  if (!E.ADMIN_PASSWORD) return res.status(503).json({ error: 'ADMIN_PASSWORD is not set in Vercel environment variables' });
+  if (SECRET.length < 16) return res.status(503).json({ error: 'TOKEN_SECRET is missing or too short (use 32+ characters) in Vercel environment variables' });
+  if (!same(String(req.body.password || '').trim(), String(E.ADMIN_PASSWORD).trim())) {
     await new Promise(r => setTimeout(r, 900));
     return res.status(401).json({ error: 'Wrong password' });
   }
@@ -233,7 +247,7 @@ app.get('/api/admin/data', adminOnly, wrap(async (req, res) => {
     sql`select o.id, o.amount, o.status, o.created_at as "createdAt", o.shot_public_id,
           u.first_name || ' ' || u.last_name as "userName", coalesce(u.email, u.phone) as phone, n.title
         from orders o join users u on u.id = o.user_id join notes n on n.id = o.note_id order by o.created_at desc limit 500`,
-    sql`select id, title, board, branch, semester, subject_code as "subjectCode", price, pages, active, created_at as "createdAt" from notes order by created_at desc limit 500`,
+    sql`select id, title, board, branch, medium, semester, subject_code as "subjectCode", price, pages, active, created_at as "createdAt" from notes order by created_at desc limit 500`,
     sql`select u.id, u.first_name || ' ' || u.last_name as name, coalesce(u.email, u.phone) as phone, u.board, u.branch, u.created_at as "createdAt",
           (u.device_id is not null) as locked,
           (select count(*)::int from orders o where o.user_id = u.id and o.status = 'approved') as unlocked
@@ -268,8 +282,8 @@ app.post('/api/admin/notes', adminOnly, wrap(async (req, res) => {
   catch (e) { return res.status(400).json({ error: 'Cloudinary could not find the uploaded PDF' }); }
   const pages = Number(info.pages) || 0;
   if (pages < 1) return res.status(400).json({ error: 'Could not read the pages of this PDF' });
-  const r = await sql`insert into notes (title, description, board, branch, semester, subject_code, price, pdf_public_id, pages)
-    values (${clean(b.title, 120)}, ${clean(b.description, 400)}, ${b.board === 'ssc' ? 'ssc' : 'msbte'}, ${clean(b.branch, 30)},
+  const r = await sql`insert into notes (title, description, board, branch, medium, semester, subject_code, price, pdf_public_id, pages)
+    values (${clean(b.title, 120)}, ${clean(b.description, 400)}, ${b.board === 'ssc' ? 'ssc' : 'msbte'}, ${clean(b.branch, 30)}, ${MEDIUMS.includes(b.medium) ? b.medium : ''},
       ${clean(b.semester, 10)}, ${clean(b.subjectCode, 20)}, ${price}, ${pid}, ${pages}) returning id`;
   res.json({ id: r[0].id, pages });
 }));

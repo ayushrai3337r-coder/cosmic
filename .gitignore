@@ -3,6 +3,3 @@ node_modules
 .env.local
 .vercel
 .env*
-
-mobile/node_modules
-mobile/android

@@ -32,16 +32,20 @@ jobs:
           npm install
           npx cap add android
 
-      - name: Patch (screenshot block and sign-in link)
+      - name: Patch (icons, screenshot block, UPI, Google sign in)
         working-directory: mobile
         run: node patch-android.mjs
 
-      - name: Use your signing key (keeps updates installable)
+      - name: Use your signing key (keeps updates and Google sign in working)
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
           mkdir -p ~/.android
-          if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore; fi
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+          else
+            echo "::warning::KEYSTORE_B64 secret is missing. A new key is used each build, so Google sign in will not work."
+          fi
 
       - name: Build APK
         working-directory: mobile/android
@@ -49,12 +53,18 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
+      - name: Show the signing SHA-1
+        run: |
+          echo "### Signing SHA-1 (add this to the Android OAuth client)" >> $GITHUB_STEP_SUMMARY
+          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android 2>/dev/null | grep -E "SHA1|SHA-1" >> $GITHUB_STEP_SUMMARY || true
+
       - name: Name the file
-        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk cosmic.apk
+        run: cp mobile/android/app/build/outputs/apk/debug/app-debug.apk ar-academy.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-${{ github.run_number }}
-          name: Cosmic app ${{ github.run_number }}
-          files: cosmic.apk
+          name: AR Academy app ${{ github.run_number }}
+          make_latest: true
+          files: ar-academy.apk

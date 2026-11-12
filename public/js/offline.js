@@ -56,7 +56,7 @@ export async function offlinePage(noteId, i) {
 
 export async function offlineRemove(noteId) {
   try {
-    await tx('pages', 'readwrite', s => s.delete(IDBKeyRange.bound(noteId + ':', noteId + ':\uffff')));
+    await tx('pages', 'readwrite', s => s.delete(IDBKeyRange.bound(noteId + ':', noteId + ':￿')));
     await tx('meta', 'readwrite', s => s.delete(String(noteId)));
   } catch (e) {}
 }
@@ -78,7 +78,7 @@ async function bake(url, mark) {
 
 export async function offlineSave(me, noteId, onProgress) {
   const f = await api('/api/notes/' + noteId + '/file?w=900');
-  const mark = (me.email || 'cosmic') + '  #' + me.id;
+  const mark = (me.email || 'AR Academy') + '  #' + me.id;
   await offlineRemove(noteId);
   try {
     for (let i = 0; i < f.pages.length; i++) {

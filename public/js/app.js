@@ -23,8 +23,11 @@ export function deviceId() {
 }
 
 export const BOARD = { msbte: 'MSBTE Diploma', ssc: 'SSC Maharashtra' };
-export const BRANCH = { cs: 'Computer Science', mech: 'Mechanical Engineering', civil: 'Civil Engineering', elect: 'Electronics', electrical: 'Electrical Engineering', it: 'Information Technology', 'ssc-general': 'SSC General', all: 'All Branches' };
-export const BRANCH_PICK = ['cs', 'mech', 'civil', 'elect', 'electrical', 'it'];
+export const BRANCH = { cs: 'Computer Engineering (CO)', it: 'Information Technology (IF)', ai: 'AI & Machine Learning (AIML)', cy: 'Cyber Security (CY)', mech: 'Mechanical Engineering (ME)', civil: 'Civil Engineering (CE)', electrical: 'Electrical Engineering (EE)', elect: 'Electronics & Telecom (EJ)', en: 'Electronics Engineering (EN)', ch: 'Chemical Engineering (CH)', ae: 'Automobile Engineering (AE)', mt: 'Mechatronics (MT)', ie: 'Instrumentation (IE)', 'ssc-general': 'SSC General', all: 'All Branches' };
+export const BRANCH_PICK = ['cs', 'it', 'ai', 'cy', 'mech', 'civil', 'electrical', 'elect', 'en', 'ch', 'ae', 'mt', 'ie'];
+export const MEDIUM = { en: 'English Medium', mr: 'Marathi Medium', hi: 'Hindi Medium' };
+export const MEDIUM_NATIVE = { en: 'English', mr: 'मराठी', hi: 'हिन्दी' };
+export const brand = '<img class="mk" src="/icons/icon.svg" alt="" width="34" height="34"><span>AR <em>Academy</em></span>';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const fmtDate = d => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
@@ -37,6 +40,7 @@ const P = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'
 };
 export const icon = n => `<svg class="ic" viewBox="0 0 24 24">${P[n]}</svg>`;
@@ -117,13 +121,13 @@ export async function shrink(file, max = 1280) {
 }
 
 export function mountShell(active, eyebrow, title, sub) {
-  const links = [['dashboard', '/dashboard', 'grid', 'Dashboard'], ['notes', '/notes', 'book', 'Browse Notes'], ['account', '/account', 'user', 'Account']];
+  const links = [['dashboard', '/dashboard', 'grid', 'Home'], ['notes', '/notes', 'book', 'Notes'], ['focus', '/focus', 'timer', 'Focus'], ['account', '/account', 'user', 'Account']];
   const nav = links.map(([k, h, i, t]) => `<a class="nav-item ${k === active ? 'active' : ''}" href="${h}">${icon(i)}${t}</a>`).join('');
-  const dock = links.map(([k, h, i, t]) => `<a class="${k === active ? 'active' : ''}" href="${h}" aria-label="${t}">${icon(i)}</a>`).join('');
+  const dock = links.map(([k, h, i, t]) => `<a class="${k === active ? 'active' : ''}" href="${h}" aria-label="${t}">${icon(i)}<small>${t}</small></a>`).join('');
   document.body.insertAdjacentHTML('beforeend', `
     <div class="app">
       <aside class="side liquid-glass-strong">
-        <a href="/" class="brand">${icon('logo')}cosmic</a>
+        <a href="/dashboard" class="brand">${brand}</a>
         ${nav}
         <div class="side-foot liquid-glass"><div class="avatar" id="sf-av">S</div><div><strong id="sf-name">Student</strong><span id="sf-phone"></span></div></div>
       </aside>
@@ -158,8 +162,21 @@ export async function requireUser(fresh) {
   const load = api('/api/me').then(m => { ls.set(ME, JSON.stringify(m)); return m; });
   if (u) load.catch(() => {}); else u = await load;
   paint(u);
+  if (u.onboarded === false && !/^\/welcome/.test(location.pathname)) { location.replace('/welcome'); return new Promise(() => {}); }
   return u;
 }
+
+/* study log kept on this phone: minutes per day, streak, last note opened */
+export const study = {
+  all() { try { return JSON.parse(ls.get('ara_study')) || {}; } catch (e) { return {}; } },
+  key(d = new Date()) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); },
+  add(min) { const a = study.all(), k = study.key(); a[k] = Math.round(((a[k] || 0) + min) * 10) / 10; ls.set('ara_study', JSON.stringify(a)); },
+  today() { return Math.round(study.all()[study.key()] || 0); },
+  week() { const a = study.all(), out = []; for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); out.push({ day: d.toLocaleDateString('en-IN', { weekday: 'short' }).slice(0, 2), min: Math.round(a[study.key(d)] || 0) }); } return out; },
+  streak() { const a = study.all(); let n = 0; const d = new Date(); if (!a[study.key(d)]) d.setDate(d.getDate() - 1); while (a[study.key(d)] >= 1) { n++; d.setDate(d.getDate() - 1); } return n; }
+};
+export const lastNote = { get() { try { return JSON.parse(ls.get('ara_last')); } catch (e) { return null; } }, set(v) { ls.set('ara_last', JSON.stringify(v)); } };
+export const pref = { get(k, d) { const v = ls.get('ara_p_' + k); return v === null ? d : JSON.parse(v); }, set(k, v) { ls.set('ara_p_' + k, JSON.stringify(v)); } };
 
 if (matchMedia('(hover:hover)').matches) {
   document.addEventListener('pointermove', e => {
@@ -207,8 +224,9 @@ export function payModal(onDone) {
         <button class="chip liquid-glass hoverable" data-m="qr">Scan QR</button>
       </div>
       <div id="pm-app">
-        <a class="btn white hoverable block" id="pm-u">Open UPI app and pay</a>
-        <p class="muted" style="margin-top:10px">Your phone shows the UPI apps you have installed, like GPay, PhonePe or Paytm. Pick one and pay.</p>
+        <div id="pm-apps" class="upi-apps"></div>
+        <a class="btn white hoverable block" id="pm-u">Pay with any UPI app</a>
+        <p class="muted" id="pm-ah" style="margin-top:10px"></p>
       </div>
       <div id="pm-qr" hidden>
         <div id="pm-code" style="width:200px;height:200px;margin:0 auto;border-radius:1rem;background:#fff;padding:10px;display:flex;align-items:center;justify-content:center;color:#000;font-size:.75rem;text-align:center"></div>
@@ -220,7 +238,7 @@ export function payModal(onDone) {
     </div></div>`);
   const $ = id => document.getElementById(id);
   let cur = null, conf = {};
-  const upiLink = o => 'upi://pay?pa=' + encodeURIComponent(conf.upiId) + '&pn=Cosmic&am=' + Number(o.amount).toFixed(2) + '&cu=INR&tn=' + encodeURIComponent('Cosmic ' + o.id);
+  const upiLink = o => 'upi://pay?pa=' + encodeURIComponent(conf.upiId) + '&pn=' + encodeURIComponent('AR Academy') + '&am=' + Number(o.amount).toFixed(2) + '&cu=INR&tn=' + encodeURIComponent('AR Academy ' + o.id);
 
   function tab(m) {
     $('pm-app').hidden = m !== 'app';
@@ -288,7 +306,30 @@ export function payModal(onDone) {
       const hasApp = !!conf.upiId;
       $('pm-tab-app').hidden = !hasApp;
       if (hasApp) $('pm-u').href = upiLink(o);
-      tab(hasApp && touch ? 'app' : 'qr');
+      $('pm-ah').textContent = 'Your phone will show the UPI apps you have installed. Pick one and pay.';
+      $('pm-apps').innerHTML = '';
+      $('pm-u').hidden = false;
+      let found = 0;
+      const U = hasApp && isApp() && window.Capacitor && window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('Upi') : null;
+      if (U) {
+        try {
+          const { apps } = await U.apps();
+          found = apps.length;
+          const box = $('pm-apps');
+          apps.forEach(a => {
+            const b = document.createElement('button');
+            b.className = 'upi-app liquid-glass hoverable';
+            b.innerHTML = '<i></i><span></span>';
+            b.querySelector('i').textContent = (a.name || '?')[0].toUpperCase();
+            b.querySelector('span').textContent = a.name;
+            b.onclick = () => U.pay({ url: upiLink(cur), package: a.package }).catch(() => toast('Could not open ' + a.name));
+            box.appendChild(b);
+          });
+          $('pm-u').hidden = found > 0;
+          $('pm-ah').textContent = found ? 'We found ' + found + ' UPI app' + (found > 1 ? 's' : '') + ' on your phone. Tap one to pay Rs ' + o.amount + '.' : 'No UPI app was found on this phone. Use Scan QR from another phone.';
+        } catch (e) { $('pm-u').hidden = false; }
+      }
+      tab(hasApp && touch && (!U || found) ? 'app' : 'qr');
     }
   };
 }

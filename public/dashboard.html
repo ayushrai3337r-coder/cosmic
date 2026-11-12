@@ -3,25 +3,39 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
-<title>Cosmic - Dashboard</title>
+<title>AR Academy - Home</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/glass.css">
 </head>
 <body>
 <script type="module">
-import { mountShell, requireUser, api, esc, icon, BOARD } from '/js/app.js';
+import { mountShell, requireUser, api, esc, icon, BOARD, BRANCH, MEDIUM, study, lastNote, pref } from '/js/app.js';
 import { offlineSync, offlineSaved } from '/js/offline.js';
-const view = mountShell('dashboard', 'Overview', 'Your study <em>desk</em>', 'Everything you have unlocked, ready to read.');
+const view = mountShell('dashboard', 'Home', 'Your study <em>desk</em>', '');
 const [me, notes] = await Promise.all([requireUser(), api('/api/notes')]);
 await offlineSync(me.id, notes);
 const saved = new Set((await offlineSaved(me.id)).map(m => m.noteId));
 const off = !navigator.onLine || !!notes.cached;
 const mine = notes.filter(n => n.status === 'approved');
 const wait = notes.filter(n => n.status === 'pending' && n.hasShot).length;
+const hr = new Date().getHours(), hi = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+view.parentElement.querySelector('.page-head h1').innerHTML = hi + ', <em>' + esc(me.firstName || 'student') + '</em>';
+const last = lastNote.get(), lastN = last && mine.find(n => n.id === last.id);
+const exam = pref.get('exam', null), days = exam ? Math.ceil((new Date(exam.date + 'T00:00:00') - new Date()) / 864e5) : null;
+const where = me.board === 'ssc' ? 'SSC ' + (MEDIUM[me.medium] || '') : (BRANCH[me.branch] || 'MSBTE');
 view.innerHTML = `
-  <div class="grid g-stats reveal" style="--d:.1s;grid-template-columns:repeat(2,1fr);max-width:520px">
+  <div class="hello reveal" style="--d:.05s"><span class="tag">${esc(BOARD[me.board] || '')}</span><span class="muted">${esc(where)}</span></div>
+  <div class="grid g-stats reveal" style="--d:.1s">
     <div class="card stat liquid-glass"><div class="label">Unlocked</div><div class="num">${mine.length}</div></div>
-    <div class="card stat liquid-glass"><div class="label">Board</div><div class="num" style="font-size:1.05rem;padding-top:10px">${esc(BOARD[me.board] || '-')}</div></div>
+    <div class="card stat liquid-glass"><div class="label">Studied today</div><div class="num">${study.today()}<small>min</small></div></div>
+    <div class="card stat liquid-glass"><div class="label">Streak</div><div class="num">${study.streak()}<small>days</small></div></div>
+    <div class="card stat liquid-glass"><div class="label">${days !== null && days >= 0 ? esc(exam.name || 'Exam') : 'Exam'}</div><div class="num">${days !== null && days >= 0 ? days + '<small>days</small>' : '-'}</div></div>
+  </div>
+  ${lastN ? `<a class="card liquid-glass resume reveal" style="--d:.15s" href="/viewer?id=${lastN.id}"><div><div class="eyebrow">Continue reading</div><h3>${esc(lastN.title)}</h3></div><span class="btn white sm">Resume</span></a>` : ''}
+  <div class="tools reveal" style="--d:.2s">
+    <a class="tool liquid-glass hoverable" href="/focus">${icon('timer')}<b>Focus timer</b><span>25 min sessions</span></a>
+    <a class="tool liquid-glass hoverable" href="/notes">${icon('book')}<b>Browse notes</b><span>For your branch</span></a>
+    <a class="tool liquid-glass hoverable" href="/focus#goal">${icon('grid')}<b>Daily goal</b><span>Track your minutes</span></a>
   </div>
   ${wait ? '<div class="card liquid-glass" style="margin-top:14px"><div class="muted">We are checking your payment. Your notes will show up here as soon as it is confirmed.</div></div>' : ''}
   <div class="sec"><h2>My <em>notes</em></h2><a href="/notes">Browse more</a></div>

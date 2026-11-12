@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/apple-touch.png">
+<title>AR Academy - Welcome</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+</head>
+<body>
+<main class="auth">
+  <div class="box wide liquid-glass-strong reveal">
+    <div class="steps" id="dots"><i class="on"></i><i></i></div>
+    <div id="p1">
+      <h1>Which <em>board</em> are you in?</h1>
+      <p class="sub">We will show only the notes that match you.</p>
+      <div class="pick">
+        <button class="opt liquid-glass hoverable" data-b="msbte"><b>MSBTE</b><span>Diploma Engineering</span></button>
+        <button class="opt liquid-glass hoverable" data-b="ssc"><b>SSC</b><span>Maharashtra Board, Class 10</span></button>
+      </div>
+    </div>
+    <div id="p2" hidden>
+      <h1 id="t2"></h1>
+      <p class="sub" id="s2"></p>
+      <div class="pick two-col" id="opts"></div>
+      <button class="btn white hoverable block" id="go" disabled>Start learning</button>
+      <button class="link" id="back">Back</button>
+    </div>
+    <p class="msg" id="msg"></p>
+  </div>
+</main>
+<script type="module">
+import { requireUser, api, BRANCH, BRANCH_PICK, MEDIUM, MEDIUM_NATIVE } from '/js/app.js';
+const $ = id => document.getElementById(id);
+const me = await requireUser(true);
+if (me.onboarded !== false) location.replace('/dashboard');
+let board = '', val = '';
+const dots = $('dots').children;
+function step2(b) {
+  board = b; val = '';
+  $('p1').hidden = true; $('p2').hidden = false;
+  dots[0].classList.remove('on'); dots[1].classList.add('on');
+  $('go').disabled = true;
+  if (b === 'msbte') {
+    $('t2').innerHTML = 'Pick your <em>branch</em>';
+    $('s2').textContent = 'MSBTE Diploma. Choose your engineering department.';
+    $('opts').innerHTML = BRANCH_PICK.map(k => { const m = /^(.*) \((\w+)\)$/.exec(BRANCH[k]); return '<button class="opt sm liquid-glass hoverable" data-v="' + k + '"><b>' + m[2] + '</b><span>' + m[1] + '</span></button>'; }).join('');
+  } else {
+    $('t2').innerHTML = 'Pick your <em>medium</em>';
+    $('s2').textContent = 'SSC Maharashtra. Choose the language you study in.';
+    $('opts').innerHTML = Object.keys(MEDIUM).map(k => '<button class="opt sm liquid-glass hoverable" data-v="' + k + '"><b>' + MEDIUM_NATIVE[k] + '</b><span>' + MEDIUM[k] + '</span></button>').join('');
+  }
+}
+document.querySelectorAll('[data-b]').forEach(x => x.onclick = () => step2(x.dataset.b));
+$('opts').addEventListener('click', e => {
+  const o = e.target.closest('[data-v]'); if (!o) return;
+  val = o.dataset.v;
+  $('opts').querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === o));
+  $('go').disabled = false;
+});
+$('back').onclick = () => { $('p1').hidden = false; $('p2').hidden = true; dots[0].classList.add('on'); dots[1].classList.remove('on'); };
+$('go').onclick = async () => {
+  $('go').disabled = true; $('go').textContent = 'Saving...';
+  try {
+    await api('/api/me', board === 'ssc' ? { board, medium: val, onboarded: true } : { board, branch: val, onboarded: true }, { method: 'PATCH' });
+    await requireUser(true);
+    location.replace('/dashboard');
+  } catch (e) { $('msg').textContent = e.message; $('go').disabled = false; $('go').textContent = 'Start learning'; }
+};
+</script>
+</body>
+</html>

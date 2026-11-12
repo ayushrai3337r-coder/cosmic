@@ -2,46 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/icon-192.png">
-<title>Cosmic - Sign in</title>
+<meta name="theme-color" content="#000000"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/apple-touch.png">
+<title>AR Academy - Sign in</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/glass.css">
 </head>
 <body>
 <main class="auth">
   <div class="box liquid-glass-strong reveal">
-    <a href="/" class="brand" id="brand" style="justify-content:center;margin-bottom:24px"></a>
+    <img class="hero-mark" src="/icons/icon.svg" alt="AR Academy" width="84" height="84">
     <div id="s1">
-      <h1>Welcome to <em>cosmic</em></h1>
-      <p class="sub" id="sub1">Continue with your Google account. No password to remember and no codes to wait for.</p>
-      <button class="btn liquid-glass-strong hoverable block" id="g"><span class="icon-circle">G</span>Continue with Google</button>
-    </div>
-    <div id="s2" hidden>
-      <h1>One last <em>step</em></h1>
-      <p class="sub" id="who"></p>
-      <div class="two">
-        <label class="field"><span>First name</span><input class="input" id="fn"></label>
-        <label class="field"><span>Last name</span><input class="input" id="ln"></label>
-      </div>
-      <label class="field"><span>Board</span><select class="input" id="board"><option value="msbte">MSBTE Diploma</option><option value="ssc">SSC Maharashtra</option></select></label>
-      <label class="field" id="bf"><span>Branch</span><select class="input" id="branch"></select></label>
-      <button class="btn liquid-glass-strong hoverable block" id="go">Create account</button>
+      <h1>Welcome to<br><em>AR Academy</em></h1>
+      <p class="sub" id="sub1">Sign in with your Google account. No password to remember.</p>
+      <button class="btn white hoverable block" id="g"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.6z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>Continue with Google</button>
+      <ul class="perks"><li>Exam-ready notes for MSBTE and SSC</li><li>Read offline, anywhere</li><li>Focus timer and study tools</li></ul>
     </div>
     <div id="s3" hidden>
       <h1>You are <em>in</em></h1>
-      <p class="sub">Tap the button to go back to the Cosmic app.</p>
-      <a class="btn white hoverable block" id="open">Open Cosmic</a>
+      <p class="sub">Tap the button to go back to the AR Academy app.</p>
+      <a class="btn white hoverable block" id="open">Open AR Academy</a>
     </div>
     <p class="msg" id="msg"></p>
     <p class="switch">One account works on one device only.</p>
   </div>
 </main>
 <script type="module">
-import { icon, api, setToken, token, deviceId, lsGet, lsSet, lsDel, BRANCH, BRANCH_PICK } from '/js/app.js';
+import { api, setToken, token, deviceId, lsGet, lsSet, lsDel } from '/js/app.js';
 const $ = id => document.getElementById(id);
-$('brand').innerHTML = icon('logo') + 'cosmic';
-$('branch').innerHTML = BRANCH_PICK.map(k => `<option value="${k}">${BRANCH[k]}</option>`).join('');
-$('board').onchange = () => { $('bf').hidden = $('board').value === 'ssc'; };
 const say = t => { $('msg').textContent = t || ''; };
 const stored = sessionStorage.getItem('msg');
 if (stored) { say(stored); sessionStorage.removeItem('msg'); }
@@ -53,14 +40,32 @@ const challenge = q.get('c') || '';
 const BROWSER_APP = q.get('app') === '1' && !NATIVE && /^[a-f0-9]{64}$/.test(challenge);
 if (token() && !BROWSER_APP) location.replace('/dashboard');
 
-let idToken = null, auth = null;
-async function googleLogin() {
-  const [{ initializeApp }, { getAuth, GoogleAuthProvider, signInWithPopup }] = await Promise.all([
+const plug = n => { try { return cap.registerPlugin ? cap.registerPlugin(n) : (cap.Plugins || {})[n]; } catch (e) { return (cap.Plugins || {})[n]; } };
+let auth = null, fb = null, cfg = null;
+async function firebase() {
+  if (fb) return fb;
+  const [app, a] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')
   ]);
-  if (!auth) auth = getAuth(initializeApp(await (await fetch('/api/config')).json()));
-  const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+  cfg = await (await fetch('/api/config')).json();
+  auth = a.getAuth(app.initializeApp(cfg));
+  return (fb = a);
+}
+async function webLogin() {
+  const a = await firebase();
+  return (await a.signInWithPopup(auth, new a.GoogleAuthProvider())).user.getIdToken();
+}
+/* inside the app: Google's own account chooser opens on top of the app, no browser window */
+async function nativeLogin() {
+  const S = plug('SocialLogin');
+  const a = await firebase();
+  if (!S || !cfg.googleWebClientId) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
+  await S.initialize({ google: { webClientId: cfg.googleWebClientId } });
+  const r = await S.login({ provider: 'google', options: {} });
+  const gid = r && r.result && r.result.idToken;
+  if (!gid) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
+  const cred = await a.signInWithCredential(auth, a.GoogleAuthProvider.credential(gid));
   return cred.user.getIdToken();
 }
 
@@ -74,87 +79,68 @@ const friendly = e => ({
 
 function showCode(code) {
   $('s1').hidden = true;
-  $('s2').hidden = true;
   $('s3').hidden = false;
-  const href = 'intent://auth?code=' + code + '#Intent;scheme=cosmic;package=com.cosmic.notes;end';
+  const href = 'intent://auth?code=' + code + '#Intent;scheme=aracademy;package=com.aracademy.app;end';
   $('open').href = href;
   location.href = href;
 }
 
-async function submit(profile) {
-  const r = BROWSER_APP
-    ? await api('/api/auth/app-code', { idToken, challenge, profile })
-    : await api('/api/auth/login', { idToken, profile, deviceId: deviceId() });
-  if (r.needsSignup) {
-    const parts = (r.name || '').split(' ');
-    $('fn').value = parts[0] || '';
-    $('ln').value = parts.slice(1).join(' ');
-    $('who').textContent = 'Signed in as ' + r.email + '. Tell us your board so we show the right notes.';
-    $('s1').hidden = true;
-    $('s2').hidden = false;
-    return;
-  }
-  if (BROWSER_APP) return showCode(r.code);
+async function submit(idToken) {
+  if (BROWSER_APP) return showCode((await api('/api/auth/app-code', { idToken, challenge })).code);
+  const r = await api('/api/auth/login', { idToken, deviceId: deviceId() });
   setToken(r.token);
-  location.href = '/dashboard';
+  location.href = r.user && r.user.onboarded === false ? '/welcome' : '/dashboard';
 }
 
-/* ----- inside the Android app: sign in through the phone browser, come back with a one-time code ----- */
+/* fallback when the native Google window is not available: browser sign in, one-time code back to the app */
 async function sha256hex(s) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
 }
 async function finishNative(url) {
-  const m = /^cosmic:\/\/auth\?code=([a-f0-9]{48})/.exec(url || '');
+  const m = /^aracademy:\/\/auth\?code=([a-f0-9]{48})/.exec(url || '');
   if (!m) return;
   say('Signing you in...');
   try {
-    const r = await api('/api/auth/exchange', { code: m[1], verifier: lsGet('cosmic_verifier') || '-', deviceId: deviceId() });
-    lsDel('cosmic_verifier');
+    const r = await api('/api/auth/exchange', { code: m[1], verifier: lsGet('ara_verifier') || '-', deviceId: deviceId() });
+    lsDel('ara_verifier');
     setToken(r.token);
-    location.replace('/dashboard');
+    location.replace(r.user && r.user.onboarded === false ? '/welcome' : '/dashboard');
   } catch (e) { say(e.message); $('g').disabled = false; }
+}
+async function browserFallback() {
+  const B = plug('Browser');
+  const v = Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
+  lsSet('ara_verifier', v);
+  const url = location.origin + '/login?app=1&c=' + await sha256hex(v);
+  if (B) await B.open({ url }); else location.href = url;
 }
 
 if (NATIVE) {
-  $('sub1').textContent = 'You will sign in with Google in your browser, then come straight back here.';
-  const P = cap.Plugins || {};
-  if (P.App) {
-    P.App.addListener('appUrlOpen', e => finishNative(e.url));
-    if (P.App.getLaunchUrl) P.App.getLaunchUrl().then(l => l && finishNative(l.url)).catch(() => {});
+  const A = plug('App');
+  if (A) {
+    A.addListener('appUrlOpen', e => finishNative(e.url));
+    if (A.getLaunchUrl) A.getLaunchUrl().then(l => l && finishNative(l.url)).catch(() => {});
   }
-  $('g').onclick = async () => {
-    $('g').disabled = true;
-    say('');
-    try {
-      const v = Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
-      lsSet('cosmic_verifier', v);
-      const url = location.origin + '/login?app=1&c=' + await sha256hex(v);
-      if (P.Browser) await P.Browser.open({ url }); else location.href = url;
-    } catch (e) { say('Could not open the browser. Try again.'); }
-    setTimeout(() => { $('g').disabled = false; }, 1500);
-  };
-} else {
-  if (BROWSER_APP) $('sub1').textContent = 'Sign in with Google, then you will be sent back to the Cosmic app.';
-  $('g').onclick = async () => {
-    const b = $('g');
-    b.disabled = true;
-    say('');
-    try {
-      idToken = await googleLogin();
-      await submit();
-    } catch (e) { say(friendly(e)); }
-    b.disabled = false;
-  };
-  $('go').onclick = async () => {
-    const b = $('go');
-    b.disabled = true;
-    say('');
-    try { await submit({ firstName: $('fn').value, lastName: $('ln').value, board: $('board').value, branch: $('branch').value }); }
-    catch (e) { say(e.message); }
-    b.disabled = false;
-  };
 }
+if (BROWSER_APP) $('sub1').textContent = 'Sign in with Google, then you will be sent back to the AR Academy app.';
+
+$('g').onclick = async () => {
+  const b = $('g');
+  b.disabled = true;
+  say('');
+  try {
+    if (NATIVE) {
+      try { await submit(await nativeLogin()); }
+      catch (e) {
+        if (e.code === 'native-missing' || /plugin|not implemented|unavailable/i.test(String(e.message))) { say('Opening Google sign in...'); await browserFallback(); }
+        else if (/cancel/i.test(String(e.message))) say('Sign in was cancelled.');
+        else throw e;
+      }
+    } else await submit(await webLogin());
+  } catch (e) { say(friendly(e)); }
+  setTimeout(() => { b.disabled = false; }, 1200);
+};
 </script>
 </body>
 </html>

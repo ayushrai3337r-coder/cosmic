@@ -1,5 +1,5 @@
-const C = 'cosmic-v3';
-const PRE = ['/', '/login', '/dashboard', '/notes', '/account', '/viewer', '/css/glass.css', '/js/app.js', '/js/offline.js', '/icons/icon.svg', '/bg.jpg', '/manifest.json'];
+const C = 'ara-v4';
+const PRE = ['/', '/intro', '/login', '/welcome', '/dashboard', '/notes', '/focus', '/account', '/viewer', '/css/glass.css', '/js/app.js', '/js/offline.js', '/icons/icon.svg', '/icons/apple-touch.png', '/bg.jpg', '/manifest.json'];
 const FONT = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => Promise.allSettled(PRE.map(u => c.add(u)))).then(() => self.skipWaiting()));
@@ -15,7 +15,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   const u = new URL(r.url);
-  if (u.origin !== location.origin || u.pathname.startsWith('/api/') || u.pathname.startsWith('/admin')) return;
+  if (u.origin !== location.origin || u.pathname.startsWith('/api/') || /^\/x-\d+/.test(u.pathname)) return;
   e.respondWith(fetch(r).then(res => {
     if (res.ok && res.type === 'basic') { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); }
     return res;
