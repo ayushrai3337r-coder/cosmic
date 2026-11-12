@@ -3,7 +3,7 @@
   "appName": "Cosmic",
   "webDir": "www",
   "server": {
-    "url": "https://YOURSITE.vercel.app/login",
+    "url": "https://cosmic-sale.vercel.app/login",
     "androidScheme": "https",
     "cleartext": false
   },

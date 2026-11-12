@@ -5,8 +5,10 @@ const ls = {
   del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
 export const token = () => ls.get(KEY);
-export const setToken = t => { ls.set(KEY, t); ls.del(ME); };
-export const clearToken = () => { ls.del(KEY); ls.del(ME); };
+const CACHED = ['/api/me', '/api/notes'];
+const wipe = () => { ls.del(ME); CACHED.forEach(p => ls.del('cosmic_c_' + p)); };
+export const setToken = t => { ls.set(KEY, t); wipe(); };
+export const clearToken = () => { ls.del(KEY); wipe(); try { indexedDB.deleteDatabase('cosmic-offline'); } catch (e) {} };
 export const lsGet = ls.get, lsSet = ls.set, lsDel = ls.del;
 export const isApp = () => /CosmicApp/.test(navigator.userAgent);
 
@@ -55,16 +57,23 @@ export async function api(path, body, opts = {}) {
   const t = token();
   if (t) headers.Authorization = 'Bearer ' + t;
   if (opts.admin) headers['x-admin-token'] = sessionStorage.getItem('at') || '';
+  const cacheKey = body === undefined && !opts.method && CACHED.includes(path) ? 'cosmic_c_' + path : null;
   let r;
   try {
     r = await fetch(path, {
       method: opts.method || (body === undefined ? 'GET' : 'POST'),
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined
+      signal: AbortSignal.timeout ? AbortSignal.timeout(cacheKey ? 8000 : 30000) : undefined
     });
-  } catch (e) { throw new Error('No internet connection. Please try again.'); }
+  } catch (e) {
+    if (cacheKey) { try { const c = JSON.parse(ls.get(cacheKey)); if (c) { c.cached = true; return c; } } catch (e2) {} }
+    const err = new Error('No internet connection. Please try again.');
+    err.offline = true;
+    throw err;
+  }
   const j = await r.json().catch(() => ({}));
+  if (cacheKey && r.ok) ls.set(cacheKey, JSON.stringify(j));
   if (r.status === 401 && j.code === 'SESSION') {
     clearToken();
     try { sessionStorage.setItem('msg', j.error || ''); } catch (e) {}
@@ -124,6 +133,13 @@ export function mountShell(active, eyebrow, title, sub) {
       </main>
     </div>
     <nav class="dock liquid-glass-strong">${dock}</nav>`);
+  const net = document.createElement('div');
+  net.className = 'toast liquid-glass-strong';
+  net.textContent = 'You are offline. Saved notes still open.';
+  net.hidden = navigator.onLine;
+  document.body.appendChild(net);
+  addEventListener('online', () => { net.hidden = true; });
+  addEventListener('offline', () => { net.hidden = false; });
   return document.getElementById('view');
 }
 

@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/css/glass.css">
 <style>
 html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-.vbar{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:20;display:flex;align-items:center;gap:14px;padding:8px 8px 8px 20px;border-radius:9999px}
+.vbar{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 20px;border-radius:9999px}
 .vbar strong{flex:1;font-weight:500;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pages{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;gap:12px;padding:84px 0 40px}
 .pg{background:#fff;border-radius:12px;overflow:hidden;max-width:100%;pointer-events:none}
@@ -24,11 +24,12 @@ body.hide #pages{visibility:hidden}
 </head>
 <body>
 <div class="shield">Notes are hidden while this window is not in focus.</div>
-<div class="vbar liquid-glass-strong"><strong id="t">Loading notes</strong><a class="btn liquid-glass hoverable sm" href="/dashboard">Back</a></div>
+<div class="vbar liquid-glass-strong"><strong id="t">Loading notes</strong><button class="btn liquid-glass hoverable sm" id="sv" hidden>Save offline</button><a class="btn liquid-glass hoverable sm" href="/dashboard">Back</a></div>
 <div id="state" class="state">Opening your notes...</div>
 <div id="pages"></div>
 <script type="module">
-import { requireUser, api } from '/js/app.js';
+import { requireUser, api, toast } from '/js/app.js';
+import { offlineMeta, offlineValid, offlinePage, offlineSave, offlineRemove, offlineSync, watermark } from '/js/offline.js';
 const $ = id => document.getElementById(id);
 
 const hideNow = () => document.body.classList.add('hide');
@@ -57,32 +58,40 @@ function loadImg(url) {
   });
 }
 
-/* dense watermark with the reader's email: a photo of the screen can still be traced back to this account */
-function watermark(ctx, w, h, text, dpr) {
-  ctx.save();
-  ctx.globalAlpha = 0.16;
-  ctx.fillStyle = '#000';
-  ctx.font = (13 * dpr) + 'px Poppins, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.rotate(-0.45);
-  const sx = 250 * dpr, sy = 95 * dpr;
-  for (let y = -h, r = 0; y < h * 2; y += sy, r++) {
-    for (let x = -w; x < w * 2; x += sx) ctx.fillText(text, x + (r % 2 ? sx / 2 : 0), y);
-  }
-  ctx.restore();
-}
-
 try {
   const me = await requireUser();
-  const id = new URLSearchParams(location.search).get('id');
+  const id = Number(new URLSearchParams(location.search).get('id')) || 0;
+
+  /* a saved copy (kept only in this app's private storage) opens without internet */
+  let meta = await offlineMeta(me.id, id);
+  let saved = offlineValid(meta) ? meta : null;
+  let f = null;
+  if (!saved) {
+    const W0 = Math.min(window.innerWidth - 24, 900), d0 = Math.min(window.devicePixelRatio || 1, 1.5);
+    try { f = await api('/api/notes/' + id + '/file?w=' + Math.min(1400, Math.max(480, Math.round(W0 * d0 / 100) * 100))); }
+    catch (e) {
+      if (e.offline) throw new Error(meta ? 'Connect to the internet once to renew your saved notes.' : 'No internet connection. Save notes offline while you are online to read them anywhere.');
+      throw e;
+    }
+  } else if (navigator.onLine) {
+    api('/api/notes').then(n => offlineSync(me.id, n)).catch(() => {});
+  }
+
+  const count = saved ? saved.count : f.pages.length;
+  $('t').textContent = saved ? saved.title : f.title;
+  const mark = (me.email || me.phone || 'cosmic') + '  #' + me.id;
   const W = Math.min(window.innerWidth - 24, 900);
   const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-  const want = Math.min(1400, Math.max(480, Math.round(W * dpr / 100) * 100));
-  const f = await api('/api/notes/' + encodeURIComponent(id) + '/file?w=' + want);
-  $('t').textContent = f.title;
-  const mark = (me.email || me.phone || 'cosmic') + '  #' + me.id;
 
-  const first = await loadImg(f.pages[0]);
+  async function getImg(i) {
+    if (!saved) return loadImg(f.pages[i]);
+    const blob = await offlinePage(id, i);
+    if (!blob) throw new Error('This saved note is incomplete. Save it again when you are online.');
+    const u = URL.createObjectURL(blob);
+    try { return await loadImg(u); } finally { URL.revokeObjectURL(u); }
+  }
+
+  const first = await getImg(0);
   $('state').hidden = true;
   const ratio = first.naturalHeight / first.naturalWidth;
 
@@ -91,7 +100,7 @@ try {
     if (d.dataset.s === '1') return;
     d.dataset.s = '1';
     try {
-      const img = pre || await loadImg(f.pages[d.dataset.i]);
+      const img = pre || await getImg(Number(d.dataset.i));
       if (d.dataset.s !== '1') return;
       const h = Math.round(W * img.naturalHeight / img.naturalWidth);
       d.style.height = h + 'px';
@@ -100,7 +109,7 @@ try {
       c.height = Math.round(h * dpr);
       const ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0, c.width, c.height);
-      watermark(ctx, c.width, c.height, mark, dpr);
+      if (!saved) watermark(ctx, c.width, c.height, mark, dpr);
       d.replaceChildren(c);
     } catch (e) { d.dataset.s = ''; }
   }
@@ -110,18 +119,41 @@ try {
   }), { rootMargin: '900px 0px' });
 
   const frag = document.createDocumentFragment();
-  f.pages.forEach((u, i) => {
+  for (let i = 0; i < count; i++) {
     const d = document.createElement('div');
     d.className = 'pg';
     d.dataset.i = i;
     d.style.width = W + 'px';
     d.style.height = Math.round(W * ratio) + 'px';
     frag.appendChild(d);
-  });
+  }
   $('pages').appendChild(frag);
   const slots = $('pages').children;
   await draw(slots[0], first);
   for (const d of slots) io.observe(d);
+
+  /* save / remove the offline copy */
+  const sv = $('sv');
+  let isSaved = !!meta;
+  const label = () => { sv.textContent = isSaved ? 'Saved offline' : 'Save offline'; sv.hidden = !navigator.onLine && !isSaved; };
+  label();
+  addEventListener('online', label);
+  addEventListener('offline', label);
+  sv.onclick = async () => {
+    sv.disabled = true;
+    try {
+      if (isSaved) {
+        if (confirm('Remove the offline copy from this phone?')) { await offlineRemove(id); isSaved = false; }
+      } else {
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+        await offlineSave(me, id, (n, t) => { sv.textContent = 'Saving ' + n + '/' + t; });
+        isSaved = true;
+        toast('Saved. This note now opens without internet.');
+      }
+    } catch (e) { toast(e.message || 'Could not save'); }
+    sv.disabled = false;
+    label();
+  };
 } catch (e) {
   const s = $('state');
   s.hidden = false;

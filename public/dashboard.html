@@ -10,8 +10,12 @@
 <body>
 <script type="module">
 import { mountShell, requireUser, api, esc, icon, BOARD } from '/js/app.js';
+import { offlineSync, offlineSaved } from '/js/offline.js';
 const view = mountShell('dashboard', 'Overview', 'Your study <em>desk</em>', 'Everything you have unlocked, ready to read.');
 const [me, notes] = await Promise.all([requireUser(), api('/api/notes')]);
+await offlineSync(me.id, notes);
+const saved = new Set((await offlineSaved(me.id)).map(m => m.noteId));
+const off = !navigator.onLine || !!notes.cached;
 const mine = notes.filter(n => n.status === 'approved');
 const wait = notes.filter(n => n.status === 'pending' && n.hasShot).length;
 view.innerHTML = `
@@ -24,10 +28,12 @@ view.innerHTML = `
   <div class="grid g-cards">
     ${mine.map(n => `
       <div class="card liquid-glass">
-        <span class="tag">${n.board === 'ssc' ? 'SSC' : 'MSBTE'}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">${n.board === 'ssc' ? 'SSC' : 'MSBTE'}</span>${saved.has(n.id) ? '<span class="tag ok">Offline</span>' : ''}</div>
         <h3 style="margin:14px 0 6px">${esc(n.title)}</h3>
         <div class="muted">Sem ${esc(n.semester)}${n.subjectCode ? ' &middot; ' + esc(n.subjectCode) : ''}</div>
-        <div class="foot"><span></span><a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${n.id}">${icon('file')}Open notes</a></div>
+        <div class="foot"><span></span>${off && !saved.has(n.id)
+          ? '<span class="btn liquid-glass sm dim">Needs internet</span>'
+          : `<a class="btn liquid-glass-strong hoverable sm" href="/viewer?id=${n.id}">${icon('file')}Open notes</a>`}</div>
       </div>`).join('') || '<div class="empty" style="grid-column:1/-1">Nothing unlocked yet. <a href="/notes">Browse notes</a></div>'}
   </div>`;
 </script>
