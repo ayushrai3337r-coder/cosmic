@@ -135,7 +135,7 @@ $('g').onclick = async () => {
     if (NATIVE) {
       try { await submit(await nativeLogin()); }
       catch (e) {
-        if (/cancel/i.test(String(e.message))) say('Sign in was cancelled.');
+        if (/cancel/i.test(String(e.message))) say('Cancelled: ' + String(e.message).slice(0, 160));
         else {
           const why = e.code === 'native-missing' ? (cfg && !cfg.googleWebClientId ? 'GOOGLE_WEB_CLIENT_ID is not set in Vercel.' : 'The Google sign in plugin is not in this app build.') : String(e.message || e).slice(0, 140);
           say('In-app Google sign in could not start. ' + why);
