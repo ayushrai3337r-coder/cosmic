@@ -143,7 +143,7 @@ $('g').onclick = async () => {
         }
       }
     } else await submit(await webLogin());
-  } catch (e) { say(friendly(e)); }
+  } catch (e) { say(friendly(e) + ' [' + (NATIVE ? 'app' : 'web') + ' ' + (e.code || '') + ']'); }
   setTimeout(() => { b.disabled = false; }, 1200);
 };
 </script>
