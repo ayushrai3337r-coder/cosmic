@@ -212,3 +212,45 @@ input[type=date].input{min-height:46px}
 @media(max-width:380px){.dock a{min-width:60px}.btn{padding:12px 18px}}
 .ctl .btn{padding:12px 20px}.ctl .btn.big{padding:14px 34px;min-width:120px}
 h1{text-wrap:balance}
+.cd{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cd div{padding:14px 6px;border-radius:1.1rem;background:rgba(61,240,162,.08);box-shadow:inset 0 0 0 1px rgba(61,240,162,.2);text-align:center}
+.cd b{display:block;font-size:clamp(1.6rem,8vw,2.3rem);font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums;color:#dfffef}
+.cd span{font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.paper{padding:14px 16px;gap:12px;flex-wrap:nowrap}
+.paper .grow{min-width:0}
+.paper.past{opacity:.45}
+.paper.now{box-shadow:inset 0 0 0 1px rgba(61,240,162,.5)}
+.dbox{width:50px;flex-shrink:0;text-align:center;padding:8px 0;border-radius:.9rem;background:rgba(255,255,255,.07)}
+.dbox b{display:block;font-size:1.25rem;font-weight:500;line-height:1}
+.dbox span{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.paper .tag{white-space:nowrap}
+.mbar{display:flex;padding:4px 6px 10px}
+@media(min-width:1024px){.mbar{display:none}}
+.music .np{margin:10px 0 12px}.np-t{font-size:1rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seek{width:100%;accent-color:#3df0a2;height:24px;background:none}
+.mc{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:4px}
+.mc button{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.08);font-size:1.05rem;color:#fff;display:flex;align-items:center;justify-content:center}
+.mc button.on{background:rgba(61,240,162,.22);color:#9dffd6}
+.mc .pp{width:58px;height:58px;background:#3df0a2;color:#00140b;font-size:1.2rem}
+.songs{margin-top:12px;max-height:210px;overflow:auto;display:grid;gap:6px}
+.song{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:.9rem;background:rgba(255,255,255,.05);font-size:.8rem;cursor:pointer}
+.song span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.song.on{background:rgba(61,240,162,.16);color:#c9ffe6}
+.song button{font-size:1.2rem;color:rgba(255,255,255,.5);padding:0 4px}
+.mini-np{font-size:.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== speed: no heavy blur on phones, shorter animations, skip off-screen work ===== */
+@media(max-width:1023px){
+  .liquid-glass,.liquid-glass-strong{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .liquid-glass{background:rgba(255,255,255,.055)}
+  .liquid-glass-strong{background:rgba(12,20,17,.9)}
+  .modal{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(0,0,0,.78)}
+  .liquid-glass::after,.liquid-glass-strong::after{display:none}
+}
+.reveal{animation-duration:.45s}
+.card,.row{contain:layout style}
+.g-cards>.card,.list>.row{content-visibility:auto;contain-intrinsic-size:auto 170px}
+body::before{will-change:auto;transform:translateZ(0)}
+.ring .bar{filter:none}
+@media(min-width:1024px){.ring .bar{filter:drop-shadow(0 0 8px rgba(61,240,162,.55))}}
+@media(max-width:1023px){.dock,.vbar{background:rgba(8,14,12,.97)}}

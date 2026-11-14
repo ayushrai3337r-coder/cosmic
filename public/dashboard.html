@@ -10,6 +10,7 @@
 <body>
 <script type="module">
 import { mountShell, requireUser, api, esc, icon, BOARD, BRANCH, MEDIUM, study, lastNote, pref } from '/js/app.js';
+import { TT_BRANCH, papersFor, nextPaper, startOf } from '/js/timetable.js';
 import { offlineSync, offlineSaved } from '/js/offline.js';
 const view = mountShell('dashboard', 'Home', 'Your study <em>desk</em>', '');
 const [me, notes] = await Promise.all([requireUser(), api('/api/notes')]);
@@ -21,7 +22,9 @@ const wait = notes.filter(n => n.status === 'pending' && n.hasShot).length;
 const hr = new Date().getHours(), hi = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
 view.parentElement.querySelector('.page-head h1').innerHTML = hi + ', <em>' + esc(me.firstName || 'student') + '</em>';
 const last = lastNote.get(), lastN = last && mine.find(n => n.id === last.id);
-const exam = pref.get('exam', null), days = exam ? Math.ceil((new Date(exam.date + 'T00:00:00') - new Date()) / 864e5) : null;
+const ex = pref.get('exams', null) || (TT_BRANCH[me.branch] ? { b: TT_BRANCH[me.branch], sem: 0 } : null);
+const np = ex && ex.sem ? nextPaper(papersFor(ex.b, ex.sem, ex.sch)) : null;
+const days = np ? Math.max(0, Math.ceil((new Date(startOf(np).toDateString()) - new Date(new Date().toDateString())) / 864e5)) : null;
 const where = me.board === 'ssc' ? 'SSC ' + (MEDIUM[me.medium] || '') : (BRANCH[me.branch] || 'MSBTE');
 view.innerHTML = `
   <div class="hello reveal" style="--d:.05s"><span class="tag">${esc(BOARD[me.board] || '')}</span><span class="muted">${esc(where)}</span></div>
@@ -29,13 +32,13 @@ view.innerHTML = `
     <div class="card stat liquid-glass"><div class="label">Unlocked</div><div class="num">${mine.length}</div></div>
     <div class="card stat liquid-glass"><div class="label">Studied today</div><div class="num">${study.today()}<small>min</small></div></div>
     <div class="card stat liquid-glass"><div class="label">Streak</div><div class="num">${study.streak()}<small>days</small></div></div>
-    <div class="card stat liquid-glass"><div class="label">${days !== null && days >= 0 ? esc(exam.name || 'Exam') : 'Exam'}</div><div class="num">${days !== null && days >= 0 ? days + '<small>days</small>' : '-'}</div></div>
+    <div class="card stat liquid-glass"><a href="/exams" style="display:block"><div class="label">${np ? esc(np.n.slice(0, 18)) : 'Next exam'}</div><div class="num">${days !== null ? days + '<small>days</small>' : 'Set'}</div></a></div>
   </div>
   ${lastN ? `<a class="card liquid-glass resume reveal" style="--d:.15s" href="/viewer?id=${lastN.id}"><div><div class="eyebrow">Continue reading</div><h3>${esc(lastN.title)}</h3></div><span class="btn white sm">Resume</span></a>` : ''}
   <div class="tools reveal" style="--d:.2s">
     <a class="tool liquid-glass hoverable" href="/focus">${icon('timer')}<b>Focus timer</b><span>25 min sessions</span></a>
     <a class="tool liquid-glass hoverable" href="/notes">${icon('book')}<b>Browse notes</b><span>For your branch</span></a>
-    <a class="tool liquid-glass hoverable" href="/focus#goal">${icon('grid')}<b>Daily goal</b><span>Track your minutes</span></a>
+    <a class="tool liquid-glass hoverable" href="/exams">${icon('cal')}<b>Exam timetable</b><span>Days left for each paper</span></a>
   </div>
   ${wait ? '<div class="card liquid-glass" style="margin-top:14px"><div class="muted">We are checking your payment. Your notes will show up here as soon as it is confirmed.</div></div>' : ''}
   <div class="sec"><h2>My <em>notes</em></h2><a href="/notes">Browse more</a></div>

@@ -282,10 +282,18 @@ app.post('/api/admin/notes', adminOnly, wrap(async (req, res) => {
   catch (e) { return res.status(400).json({ error: 'Cloudinary could not find the uploaded PDF' }); }
   const pages = Number(info.pages) || 0;
   if (pages < 1) return res.status(400).json({ error: 'Could not read the pages of this PDF' });
-  const r = await sql`insert into notes (title, description, board, branch, medium, semester, subject_code, price, pdf_public_id, pages)
-    values (${clean(b.title, 120)}, ${clean(b.description, 400)}, ${b.board === 'ssc' ? 'ssc' : 'msbte'}, ${clean(b.branch, 30)}, ${MEDIUMS.includes(b.medium) ? b.medium : ''},
-      ${clean(b.semester, 10)}, ${clean(b.subjectCode, 20)}, ${price}, ${pid}, ${pages}) returning id`;
-  res.json({ id: r[0].id, pages });
+  const board = b.board === 'ssc' ? 'ssc' : 'msbte';
+  const sems = (Array.isArray(b.semesters) && b.semesters.length ? b.semesters : [b.semester]).map(x => clean(x, 10)).filter(Boolean).slice(0, 8);
+  const brs = board === 'ssc' ? ['ssc-general'] : (Array.isArray(b.branches) && b.branches.length ? b.branches : [b.branch]).map(x => clean(x, 30)).filter(Boolean).slice(0, 20);
+  if (!sems.length || !brs.length) return res.status(400).json({ error: 'Choose a department and a semester' });
+  let made = 0;
+  for (const br of brs) for (const sem of sems) {
+    await sql`insert into notes (title, description, board, branch, medium, semester, subject_code, price, pdf_public_id, pages)
+      values (${clean(b.title, 120)}, ${clean(b.description, 400)}, ${board}, ${br}, ${MEDIUMS.includes(b.medium) ? b.medium : ''},
+        ${sem}, ${clean(b.subjectCode, 20)}, ${price}, ${pid}, ${pages})`;
+    made++;
+  }
+  res.json({ id: made, pages, made });
 }));
 
 app.post('/api/admin/notes/:id/toggle', adminOnly, wrap(async (req, res) => {

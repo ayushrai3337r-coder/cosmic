@@ -23,6 +23,7 @@
       <a class="btn white hoverable block" id="open">Open AR Academy</a>
     </div>
     <p class="msg" id="msg"></p>
+    <button class="link" id="alt" hidden>Sign in with the browser instead</button>
     <p class="switch">One account works on one device only.</p>
   </div>
 </main>
@@ -125,6 +126,7 @@ if (NATIVE) {
 }
 if (BROWSER_APP) $('sub1').textContent = 'Sign in with Google, then you will be sent back to the AR Academy app.';
 
+$('alt').onclick = () => browserFallback().catch(() => say('Could not open the browser.'));
 $('g').onclick = async () => {
   const b = $('g');
   b.disabled = true;
@@ -133,9 +135,12 @@ $('g').onclick = async () => {
     if (NATIVE) {
       try { await submit(await nativeLogin()); }
       catch (e) {
-        if (e.code === 'native-missing' || /plugin|not implemented|unavailable/i.test(String(e.message))) { say('Opening Google sign in...'); await browserFallback(); }
-        else if (/cancel/i.test(String(e.message))) say('Sign in was cancelled.');
-        else throw e;
+        if (/cancel/i.test(String(e.message))) say('Sign in was cancelled.');
+        else {
+          const why = e.code === 'native-missing' ? (cfg && !cfg.googleWebClientId ? 'GOOGLE_WEB_CLIENT_ID is not set in Vercel.' : 'The Google sign in plugin is not in this app build.') : String(e.message || e).slice(0, 140);
+          say('In-app Google sign in could not start. ' + why);
+          $('alt').hidden = false;
+        }
       }
     } else await submit(await webLogin());
   } catch (e) { say(friendly(e)); }

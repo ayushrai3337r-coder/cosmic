@@ -9,7 +9,8 @@
 </head>
 <body>
 <script type="module">
-import { mountShell, requireUser, toast, study, pref, esc } from '/js/app.js';
+import { mountShell, requireUser, toast, study, pref, esc, icon } from '/js/app.js';
+import { songs, player } from '/js/music.js';
 const view = mountShell('focus', 'Study tools', 'Focus <em>zone</em>', 'Set a timer, put the phone down and study. Every minute is counted.');
 await requireUser();
 const $ = id => document.getElementById(id);
@@ -39,6 +40,14 @@ view.innerHTML = `
         <div class="two-stat"><div><b id="st">0</b><span>day streak</span></div><div><b id="ss">0</b><span>sessions</span></div></div>
       </div>
       <div class="card liquid-glass reveal" style="--d:.3s"><div class="eyebrow">This week</div><div class="bars wk" id="wk"></div></div>
+      <div class="card liquid-glass music reveal" style="--d:.35s"><div class="eyebrow">Study music</div>
+        <div class="np"><div class="np-t" id="np-t">No song playing</div><div class="np-s muted" id="np-s">Add songs from your phone</div></div>
+        <input type="range" class="seek" id="sk" min="0" max="1000" value="0" aria-label="Seek">
+        <div class="mc"><button id="m-sh" aria-label="Shuffle">&#8644;</button><button id="m-pv" aria-label="Previous">&#9198;</button><button class="pp" id="m-pp" aria-label="Play">&#9654;</button><button id="m-nx" aria-label="Next">&#9197;</button><button id="m-rp" aria-label="Repeat">&#8635;</button></div>
+        <label class="btn liquid-glass hoverable sm block" style="margin-top:14px">Add songs from phone<input type="file" id="m-f" accept="audio/*" multiple hidden></label>
+        <div class="songs" id="m-l"></div>
+        <p class="muted" style="margin-top:10px;font-size:.68rem">Songs are copied into this app only. Music pauses if you open another page.</p>
+      </div>
       <div class="card liquid-glass reveal" style="--d:.4s"><div class="eyebrow">Exam countdown</div>
         <div id="cd"></div>
         <div class="two" style="margin-top:12px"><input class="input" id="en" placeholder="Exam name" maxlength="30"><input class="input" id="ed" type="date"></div>
@@ -47,8 +56,8 @@ view.innerHTML = `
   </div>
   <div class="immerse" id="im" hidden>
     <button class="x btn liquid-glass hoverable sm" id="ex">Exit</button>
-    <div class="q" id="qt"></div><div class="big-clock" id="bc">25:00</div><div class="muted" id="bs"></div>
-    <div class="ctl"><button class="btn white hoverable big" id="bg">Pause</button></div>
+    <div class="q" id="qt"></div><div class="mini-np muted" id="im-np"></div><div class="big-clock" id="bc">25:00</div><div class="muted" id="bs"></div>
+    <div class="ctl"><button class="btn white hoverable big" id="bg">Pause</button><button class="btn liquid-glass hoverable" id="im-m" aria-label="Music">&#9654; Music</button></div>
   </div>`;
 
 const R = 2 * Math.PI * 100;
@@ -110,6 +119,38 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && S.running && S.mode === 'focus' && !$('im').hidden) away++;
   else if (!document.hidden) { if (S.running) { lockScreen(true); if (left() <= 0) finish(); } if (away) { toast('You left the screen ' + away + ' time' + (away > 1 ? 's' : '') + '. Stay focused!'); away = 0; } draw(); }
 });
+
+/* study music */
+const fmtT = s => isFinite(s) ? Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0') : '0:00';
+function mdraw() {
+  const t = player.track, a = player.audio;
+  $('np-t').textContent = t ? t.name : 'No song playing';
+  $('np-s').textContent = t ? fmtT(a.currentTime) + ' / ' + fmtT(a.duration) : (player.list.length ? player.list.length + ' songs ready' : 'Add songs from your phone');
+  $('m-pp').innerHTML = player.playing ? '&#10074;&#10074;' : '&#9654;';
+  $('m-sh').classList.toggle('on', player.shuffle);
+  $('m-rp').classList.toggle('on', player.repeat > 0);
+  $('m-rp').textContent = player.repeat === 2 ? '\u21BB1' : '\u21BB';
+  if (document.activeElement !== $('sk')) $('sk').value = a.duration ? Math.round(a.currentTime / a.duration * 1000) : 0;
+  $('im-np').textContent = t ? 'Now playing: ' + t.name : '';
+  $('m-l').innerHTML = player.list.map((s, i) => `<div class="song ${player.index === i ? 'on' : ''}" data-i="${i}"><span>${esc(s.name)}</span><button data-x="${s.id}" aria-label="Remove">&times;</button></div>`).join('');
+}
+player.on(mdraw);
+$('m-f').onchange = async e => {
+  try { const n = await songs.add([...e.target.files]); toast(n ? n + ' song' + (n > 1 ? 's' : '') + ' added' : 'Choose audio files'); await player.load(); } catch (err) { toast('Could not save songs'); }
+  e.target.value = '';
+};
+$('m-pp').onclick = () => player.toggle();
+$('m-nx').onclick = () => player.next();
+$('m-pv').onclick = () => player.prev();
+$('m-sh').onclick = () => player.toggleShuffle();
+$('m-rp').onclick = () => player.cycleRepeat();
+$('sk').onchange = e => player.seek(e.target.value / 1000);
+$('im-m').onclick = () => (player.list.length ? player.toggle() : toast('Add songs on the Focus page first'));
+$('m-l').onclick = async e => {
+  const x = e.target.closest('[data-x]'), r = e.target.closest('[data-i]');
+  if (x) { await songs.remove(Number(x.dataset.x)); await player.load(); } else if (r) player.play(Number(r.dataset.i));
+};
+player.load().then(mdraw);
 
 /* exam countdown */
 function cd() {

@@ -40,6 +40,8 @@ const P = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'
 };
@@ -121,7 +123,7 @@ export async function shrink(file, max = 1280) {
 }
 
 export function mountShell(active, eyebrow, title, sub) {
-  const links = [['dashboard', '/dashboard', 'grid', 'Home'], ['notes', '/notes', 'book', 'Notes'], ['focus', '/focus', 'timer', 'Focus'], ['account', '/account', 'user', 'Account']];
+  const links = [['dashboard', '/dashboard', 'grid', 'Home'], ['notes', '/notes', 'book', 'Notes'], ['exams', '/exams', 'cal', 'Exams'], ['focus', '/focus', 'timer', 'Focus'], ['account', '/account', 'user', 'Account']];
   const nav = links.map(([k, h, i, t]) => `<a class="nav-item ${k === active ? 'active' : ''}" href="${h}">${icon(i)}${t}</a>`).join('');
   const dock = links.map(([k, h, i, t]) => `<a class="${k === active ? 'active' : ''}" href="${h}" aria-label="${t}">${icon(i)}<small>${t}</small></a>`).join('');
   document.body.insertAdjacentHTML('beforeend', `
@@ -132,6 +134,7 @@ export function mountShell(active, eyebrow, title, sub) {
         <div class="side-foot liquid-glass"><div class="avatar" id="sf-av">S</div><div><strong id="sf-name">Student</strong><span id="sf-phone"></span></div></div>
       </aside>
       <main class="content">
+        <a href="/dashboard" class="brand mbar">${brand}</a>
         <div class="page-head reveal"><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>
         <div id="view"></div>
       </main>

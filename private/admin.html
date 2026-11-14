@@ -124,25 +124,52 @@ function salesView() {
       <div class="row liquid-glass"><div class="grow"><h3>${esc(o.title)}</h3><div class="muted">${esc(o.userName)} &middot; ${fmtDate(o.createdAt)}</div></div><div class="price">${rs(o.amount)}</div></div>`).join('') || '<div class="empty">No approved sales yet</div>'}</div>`;
 }
 
+const U = { board: 'msbte', branches: new Set(), sems: new Set(), medium: '' };
+const pk = (cls, v, t, on) => `<button type="button" class="chip liquid-glass hoverable ${on ? 'on' : ''}" data-${cls}="${v}">${t}</button>`;
 function uploadView() {
-  const br = Object.entries(BRANCH).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
-  const sem = [1, 2, 3, 4, 5, 6].map(n => `<option value="${n}">Semester ${n}</option>`).join('') + '<option value="all">All semesters</option>';
+  const brs = Object.keys(BRANCH).filter(k => k !== 'ssc-general' && k !== 'all');
   return `
-    <div class="card liquid-glass" style="max-width:680px">
+    <div class="card liquid-glass" style="max-width:720px">
       <div class="two">
         <label class="field"><span>Title</span><input class="input" id="u-title" placeholder="Engineering Maths Sem 1"></label>
         <label class="field"><span>Price (Rs, 0 for free)</span><input class="input" id="u-price" type="number" min="0" placeholder="49"></label>
-        <label class="field"><span>Board</span><select class="input" id="u-board"><option value="msbte">MSBTE Diploma</option><option value="ssc">SSC Maharashtra</option></select></label>
-        <label class="field"><span>Branch</span><select class="input" id="u-branch">${br}</select></label>
-        <label class="field"><span>SSC medium (SSC only)</span><select class="input" id="u-med"><option value="">All mediums</option>${Object.entries(MEDIUM).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-        <label class="field"><span>Semester</span><select class="input" id="u-sem">${sem}</select></label>
+      </div>
+      <div class="eyebrow">Board</div>
+      <div class="chips" id="pk-board" style="margin:10px 0 16px">${pk('ub', 'msbte', 'MSBTE Diploma', U.board === 'msbte')}${pk('ub', 'ssc', 'SSC Maharashtra', U.board === 'ssc')}</div>
+      <div id="pk-msbte" ${U.board === 'ssc' ? 'hidden' : ''}>
+        <div class="eyebrow">Department (tap one or more)</div>
+        <div class="chips" id="pk-br" style="margin:10px 0 16px">${pk('br', 'all', 'All departments', U.branches.has('all'))}${brs.map(k => pk('br', k, BRANCH[k], U.branches.has(k))).join('')}</div>
+        <div class="eyebrow">Semester (tap one or more)</div>
+        <div class="chips" id="pk-sem" style="margin:10px 0 16px">${[1, 2, 3, 4, 5, 6].map(n => pk('sm', n, 'Sem ' + n, U.sems.has(String(n)))).join('')}${pk('sm', 'all', 'All', U.sems.has('all'))}</div>
+      </div>
+      <div id="pk-ssc" ${U.board === 'ssc' ? '' : 'hidden'}>
+        <div class="eyebrow">Medium</div>
+        <div class="chips" id="pk-med" style="margin:10px 0 16px">${pk('md', '', 'All mediums', U.medium === '')}${Object.entries(MEDIUM).map(([k, v]) => pk('md', k, v, U.medium === k)).join('')}</div>
+      </div>
+      <div class="two">
         <label class="field"><span>Subject code</span><input class="input" id="u-code" placeholder="22213"></label>
       </div>
       <label class="field"><span>Description</span><textarea class="input" id="u-desc" placeholder="What is inside these notes"></textarea></label>
       <label class="field"><span>PDF file (max 10 MB)</span><input class="input" id="u-file" type="file" accept="application/pdf"></label>
+      <div class="muted" id="pk-sum" style="margin-bottom:14px"></div>
       <button class="btn liquid-glass-strong hoverable" id="up-go">${icon('upload')}Upload and publish</button>
     </div>`;
 }
+function pickSum() {
+  const e = document.getElementById('pk-sum');
+  if (!e) return;
+  e.textContent = U.board === 'ssc' ? 'Will publish for SSC' + (U.medium ? ' (' + MEDIUM[U.medium] + ')' : ' (all mediums)') : (U.branches.size && U.sems.size ? 'Will publish for ' + (U.branches.has('all') ? 'all departments' : U.branches.size + ' department(s)') + ', ' + (U.sems.has('all') ? 'all semesters' : U.sems.size + ' semester(s)') : 'Choose at least one department and one semester');
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-ub],[data-br],[data-sm],[data-md]');
+  if (!t || !document.getElementById('pk-sum')) return;
+  const tog = (set, v) => { set.has(v) ? set.delete(v) : set.add(v); t.classList.toggle('on', set.has(v)); };
+  if (t.dataset.ub) { U.board = t.dataset.ub; document.getElementById('pk-board').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); document.getElementById('pk-msbte').hidden = U.board === 'ssc'; document.getElementById('pk-ssc').hidden = U.board !== 'ssc'; }
+  else if (t.dataset.br) { const v = t.dataset.br; if (v === 'all') { U.branches.clear(); document.getElementById('pk-br').querySelectorAll('.chip').forEach(c => c.classList.remove('on')); } else { U.branches.delete('all'); document.querySelector('#pk-br [data-br=all]').classList.remove('on'); } tog(U.branches, v); }
+  else if (t.dataset.sm) { const v = t.dataset.sm; if (v === 'all') { U.sems.clear(); document.getElementById('pk-sem').querySelectorAll('.chip').forEach(c => c.classList.remove('on')); } else { U.sems.delete('all'); document.querySelector('#pk-sem [data-sm=all]').classList.remove('on'); } tog(U.sems, v); }
+  else if (t.dataset.md !== undefined) { U.medium = t.dataset.md; document.getElementById('pk-med').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); }
+  pickSum();
+});
 
 function notesView() {
   return `<div class="list">${D.notes.map(n => `
@@ -171,6 +198,7 @@ function usersView() {
 function draw() {
   document.querySelectorAll('#tabs .chip').forEach(c => c.classList.toggle('on', c.dataset.t === tab));
   $('v').innerHTML = { orders: ordersView, sales: salesView, upload: uploadView, notes: notesView, users: usersView }[tab]();
+  if (tab === 'upload') pickSum();
   const s = $('q');
   if (s && q) { s.focus(); s.setSelectionRange(q.length, q.length); }
 }
@@ -210,6 +238,7 @@ $('v').addEventListener('click', async e => {
     if (up) {
       const file = $('u-file').files[0], title = $('u-title').value.trim(), price = $('u-price').value;
       if (!title || price === '' || !file) return toast('Title, price and a PDF are required');
+      if (U.board === 'msbte' && (!U.branches.size || !U.sems.size)) return toast('Choose at least one department and one semester');
       if (file.type !== 'application/pdf') return toast('Only PDF files are allowed');
       if (file.size > 10 * 1024 * 1024) return toast('This PDF is over 10 MB. Compress it first.');
       up.disabled = true;
@@ -219,10 +248,10 @@ $('v').addEventListener('click', async e => {
         const pdfPublicId = await cloudUpload(file, sign);
         const r = await api('/api/admin/notes', {
           title, price, pdfPublicId,
-          board: $('u-board').value, branch: $('u-branch').value, medium: $('u-med').value, semester: $('u-sem').value,
+          board: U.board, branches: [...U.branches], semesters: [...U.sems], medium: U.medium,
           subjectCode: $('u-code').value.trim(), description: $('u-desc').value.trim()
         }, A);
-        toast('Notes published with ' + r.pages + ' pages');
+        toast('Published ' + r.made + ' listing' + (r.made > 1 ? 's' : '') + ' (' + r.pages + ' pages)');
         tab = 'notes';
         await load();
       } finally { up.disabled = false; }
