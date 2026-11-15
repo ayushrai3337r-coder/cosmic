@@ -63,7 +63,7 @@ async function nativeLogin() {
   const a = await firebase();
   if (!S || !cfg.googleWebClientId) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
   await S.initialize({ google: { webClientId: cfg.googleWebClientId } });
-  const r = await S.login({ provider: 'google', options: {} });
+  const r = await S.login({ provider: 'google', options: { filterByAuthorizedAccounts: false } });
   const gid = r && r.result && r.result.idToken;
   if (!gid) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
   const cred = await a.signInWithCredential(auth, a.GoogleAuthProvider.credential(gid));
@@ -135,7 +135,7 @@ $('g').onclick = async () => {
     if (NATIVE) {
       try { await submit(await nativeLogin()); }
       catch (e) {
-        if (/cancel/i.test(String(e.message))) say('Cancelled: ' + String(e.message).slice(0, 160));
+        if (/cancel/i.test(String(e.message))) say('Cancelled: ' + String(e.message).slice(0, 160) + ' [client ' + String((cfg && cfg.googleWebClientId) || 'none').slice(0, 13) + ']');
         else {
           const why = e.code === 'native-missing' ? (cfg && !cfg.googleWebClientId ? 'GOOGLE_WEB_CLIENT_ID is not set in Vercel.' : 'The Google sign in plugin is not in this app build.') : String(e.message || e).slice(0, 140);
           say('In-app Google sign in could not start. ' + why);
