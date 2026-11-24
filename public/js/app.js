@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) window.addEventListener('load', () => navigato
 export async function uploadShot(orderId, file) {
   const sign = await api('/api/orders/' + orderId + '/shot-sign', {});
   const pid = await cloudUpload(await shrink(file), sign);
-  await api('/api/orders/' + orderId + '/shot', { publicId: pid });
+  return api('/api/orders/' + orderId + '/shot', { publicId: pid });
 }
 
 /* ---------- payment window: UPI app button + QR code ---------- */
@@ -288,8 +288,9 @@ export function payModal(onDone) {
     b.disabled = true;
     b.textContent = 'Uploading...';
     try {
-      await uploadShot(cur.id, file);
-      toast('Screenshot sent. We will confirm your payment soon.');
+      b.textContent = 'Checking payment...';
+      const r = await uploadShot(cur.id, file);
+      toast(r.result === 'approved' ? 'Payment confirmed. Your notes are unlocked!' : r.result === 'rejected' ? 'We could not verify this payment. Check the amount and upload the right screenshot, or try again.' : 'Screenshot received. We will confirm your payment soon.');
       $('pm').classList.remove('open');
       if (onDone) await onDone();
     } catch (e) { toast(e.message); }
@@ -335,4 +336,24 @@ export function payModal(onDone) {
       tab(hasApp && touch && (!U || found) ? 'app' : 'qr');
     }
   };
+}
+
+/* small banner: the next big paper (English Communication Skills, Sem 1). Tapping it opens the PDF straight away. */
+export async function promoBanner(notes) {
+  const n = notes.find(x => x.board === 'msbte' && /communication skills|english communication/i.test(x.title) && (!x.semester || x.semester === '1' || x.semester === 'all'));
+  if (!n) return '';
+  let when = '';
+  try {
+    const { TT, startOf } = await import('/js/timetable.js');
+    const p = TT.filter(r => ['311303', '22101'].includes(r.c)).sort((a, b) => startOf(a) - startOf(b))[0];
+    if (p) {
+      const d = Math.ceil((new Date(startOf(p).toDateString()) - new Date(new Date().toDateString())) / 864e5);
+      if (d < 0) return '';
+      when = d === 0 ? 'Exam today' : d === 1 ? 'Exam tomorrow' : 'Exam in ' + d + ' days';
+    }
+  } catch (e) {}
+  const open = n.status === 'approved';
+  return `<a class="promo reveal" style="--d:.05s" href="${open ? '/viewer?id=' + n.id : '/notes?buy=' + n.id}">
+    <div class="pm-l"><span class="pm-tag">Sem 1 &middot; ${esc(when || 'Exam soon')}</span><b>English Communication Skills</b><span class="pm-s">${open ? 'Your notes are ready. Tap to read now.' : 'Important questions and quick revision' + (n.price ? ' for Rs ' + n.price : '')}</span></div>
+    <span class="pm-go">${open ? 'Open PDF' : 'Get it'}<svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>`;
 }

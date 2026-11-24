@@ -9,7 +9,7 @@
 </head>
 <body>
 <script type="module">
-import { mountShell, requireUser, api, payModal, esc, toast, BRANCH, MEDIUM } from '/js/app.js';
+import { mountShell, requireUser, api, payModal, esc, toast, BRANCH, MEDIUM, promoBanner } from '/js/app.js';
 const view = mountShell('notes', 'Library', 'Browse <em>notes</em>', 'Pick a subject, pay with your UPI app, and it unlocks once your payment is confirmed.');
 const [me, loaded] = await Promise.all([requireUser(), api('/api/notes').catch(e => e)]);
 if (loaded instanceof Error) { view.innerHTML = '<div class="empty">Could not load notes: ' + esc(loaded.message) + '</div>'; throw loaded; }
@@ -17,6 +17,7 @@ let notes = loaded, board = 'mine', q = '';
 const $ = id => document.getElementById(id);
 
 view.innerHTML = `
+  ${await promoBanner(notes)}
   <div class="reveal" style="--d:.1s">
     <input class="input" id="q" placeholder="Search by title, branch or code" style="margin-bottom:14px">
     <div class="chips">
@@ -38,7 +39,7 @@ function button(n) {
 }
 
 function draw() {
-  const mineOk = n => n.board === me.board && (me.board === 'ssc' ? (!n.medium || n.medium === me.medium) : (!n.branch || n.branch === me.branch || n.branch === 'all'));
+  const mineOk = n => n.board === me.board && (me.board === 'ssc' ? (!n.medium || n.medium === me.medium) : ((!n.branch || n.branch === me.branch || n.branch === 'all') && (!me.semester || !n.semester || n.semester === 'all' || n.semester === me.semester)));
   const list = notes.filter(n => (board === 'all' || (board === 'mine' ? mineOk(n) : n.board === board)) && (!q || [n.title, n.branch, n.subjectCode].join(' ').toLowerCase().includes(q)));
   $('grid').innerHTML = list.map(n => `
       <div class="card liquid-glass">
@@ -60,20 +61,28 @@ view.querySelector('.chips').addEventListener('click', e => {
   draw();
 });
 
-$('grid').addEventListener('click', async e => {
-  const b = e.target.closest('[data-buy]');
-  if (!b) return;
-  b.disabled = true;
+async function buy(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
   try {
-    const n = notes.find(x => x.id === Number(b.dataset.buy));
+    if (n.status === 'approved') { location.href = '/viewer?id=' + n.id; return; }
     const r = await api('/api/orders', { noteId: n.id });
     n.status = r.status;
     if (r.status === 'approved') { toast('Unlocked. Open it from your dashboard.'); draw(); return; }
     n.hasShot = false;
     draw();
     pay.open({ id: r.id, title: n.title, amount: r.amount });
-  } catch (err) { toast(err.message); b.disabled = false; }
+  } catch (err) { toast(err.message); }
+}
+$('grid').addEventListener('click', async e => {
+  const b = e.target.closest('[data-buy]');
+  if (!b) return;
+  b.disabled = true;
+  await buy(Number(b.dataset.buy));
+  b.disabled = false;
 });
+const want = Number(new URLSearchParams(location.search).get('buy')) || 0;
+if (want) buy(want);
 </script>
 </body>
 </html>

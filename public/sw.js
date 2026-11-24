@@ -1,4 +1,4 @@
-const C = 'ara-v5';
+const C = 'ara-v8';
 const PRE = ['/', '/intro', '/login', '/welcome', '/dashboard', '/notes', '/exams', '/focus', '/account', '/viewer', '/css/glass.css', '/js/app.js', '/js/offline.js', '/js/timetable.js', '/js/music.js', '/icons/icon.svg', '/icons/apple-touch.png', '/bg.jpg', '/manifest.json'];
 const FONT = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 self.addEventListener('install', e => {

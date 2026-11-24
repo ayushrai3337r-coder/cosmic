@@ -77,7 +77,7 @@ function ordersView() {
     <div class="chips">${['all', 'pending', 'approved', 'rejected'].map(s => `<button class="chip liquid-glass hoverable ${filt === s ? 'on' : ''}" data-f="${s}">${s}</button>`).join('')}</div>
     <div class="list">${list.map(o => `
       <div class="row liquid-glass">
-        <div class="grow"><h3>${esc(o.title)}</h3><div class="muted">${esc(o.userName)} &middot; ${esc(o.phone)} &middot; ${fmtDate(o.createdAt)} &middot; Order #${o.id}</div></div>
+        <div class="grow"><h3>${esc(o.title)}</h3><div class="muted">${esc(o.userName)} &middot; ${esc(o.phone)} &middot; ${fmtDate(o.createdAt)} &middot; Order #${o.id}${o.utr ? ' &middot; UTR ' + esc(o.utr) : ''}${o.autoNote ? ' &middot; ' + esc(o.autoNote) : ''}</div></div>
         <div class="price">Rs ${o.amount}</div>
         ${o.shotUrl ? `<a class="btn liquid-glass hoverable sm" target="_blank" rel="noopener" href="${esc(o.shotUrl)}">Screenshot</a>` : '<span class="muted">No screenshot</span>'}
         ${tag(o.status)}

@@ -14,7 +14,7 @@ import { TT_BRANCH, TT_NAMES, schemesFor, papersFor, nextPaper, startOf } from '
 const view = mountShell('exams', 'Winter 2026', 'Exam <em>countdown</em>', 'MSBTE theory timetable. Pick your semester and see every paper with the days left.');
 const me = await requireUser();
 const $ = id => document.getElementById(id);
-let S = pref.get('exams', null) || { b: TT_BRANCH[me.branch] || 'CO', sem: 5, sch: '' };
+let S = pref.get('exams', null) || { b: TT_BRANCH[me.branch] || 'CO', sem: Number(me.semester) || 5, sch: '' };
 const SCH = { I: 'I scheme', K: 'K scheme', G: 'G scheme', E: 'E scheme', C: 'C scheme' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 view.innerHTML = `

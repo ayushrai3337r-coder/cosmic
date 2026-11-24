@@ -254,3 +254,16 @@ body::before{will-change:auto;transform:translateZ(0)}
 .ring .bar{filter:none}
 @media(min-width:1024px){.ring .bar{filter:drop-shadow(0 0 8px rgba(61,240,162,.55))}}
 @media(max-width:1023px){.dock,.vbar{background:rgba(8,14,12,.97)}}
+.promo{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 16px;padding:16px 18px;border-radius:1.5rem;background:linear-gradient(120deg,rgba(25,230,140,.22),rgba(8,150,95,.10) 60%,rgba(255,255,255,.04));box-shadow:inset 0 0 0 1px rgba(61,240,162,.4),0 8px 30px rgba(25,230,140,.12)}
+.pm-l{display:flex;flex-direction:column;gap:5px;min-width:0}
+.pm-tag{font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:#9dffd6;font-weight:500}
+.promo b{font-size:1.08rem;font-weight:600;letter-spacing:-.02em}
+.pm-s{font-size:.72rem;color:rgba(255,255,255,.65);line-height:1.4}
+.pm-go{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:11px 16px;border-radius:99px;background:#fff;color:#000;font-size:.78rem;font-weight:500}
+.pm-go .ic{font-size:.95rem}
+@media(max-width:400px){.promo{flex-direction:column;align-items:stretch}.pm-go{justify-content:center}}
+.applist{overflow:auto;display:grid;gap:6px;max-height:50vh}
+.aprow{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:.9rem;background:rgba(255,255,255,.05);font-size:.82rem}
+.aprow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aprow img{border-radius:9px}
+.aprow input{width:20px;height:20px;accent-color:#3df0a2}

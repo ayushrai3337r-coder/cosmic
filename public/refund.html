@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><link rel="icon" href="/icons/icon.svg"><link rel="apple-touch-icon" href="/icons/apple-touch.png">
+<title>Refund Policy - AR Academy</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&family=Source+Serif+4:ital,wght@1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/glass.css">
+<style>.doc{position:relative;z-index:10;max-width:760px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 18px 60px}.doc .card{margin-top:18px;padding:26px 24px}.doc h2{font-size:1.05rem;margin:22px 0 8px;letter-spacing:-.02em}.doc h2:first-child{margin-top:0}.doc p,.doc li{font-size:.86rem;line-height:1.75;color:rgba(255,255,255,.75)}.doc ul{padding-left:20px;display:grid;gap:4px}.doc a.u{text-decoration:underline;color:#9dffd6}</style>
+</head>
+<body>
+<div class="doc">
+<a href="/" class="brand"><img class="mk" src="/icons/icon.svg" alt="" width="34" height="34"><span>AR <em>Academy</em></span></a>
+<div class="page-head" style="padding-left:0"><div class="eyebrow">Last updated 24 November 2026</div><h1>Refund <em>policy</em></h1></div>
+<div class="card liquid-glass">
+
+<h2>Digital notes</h2>
+<p>Notes are digital content that unlock as soon as your payment is confirmed, so payments are not refundable once the notes are opened.</p>
+<h2>When we will help</h2>
+<ul><li>You paid twice for the same notes.</li><li>You paid but the notes did not unlock within 24 hours.</li><li>The file is broken or does not match what was described.</li></ul>
+<p>Write to us within 7 days with your payment screenshot and the email you signed in with. If we agree, the refund is sent to the UPI account you paid from.</p>
+<h2>Contact</h2>
+<p>Questions about this page? Write to us at <a class="u" id="em" href="#">our support email</a>.</p>
+</div>
+<p class="muted" style="margin-top:18px;text-align:center"><a class="u" href="/privacy">Privacy</a> &middot; <a class="u" href="/terms">Terms</a> &middot; <a class="u" href="/refund">Refunds</a></p>
+</div>
+<script>fetch('/api/config').then(r=>r.json()).then(c=>{if(c.supportEmail){var a=document.getElementById('em');a.href='mailto:'+c.supportEmail;a.textContent=c.supportEmail}}).catch(function(){})</script>
+</body>
+</html>

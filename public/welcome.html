@@ -11,7 +11,7 @@
 <main class="auth">
   <div class="box wide liquid-glass-strong reveal">
     <img class="hero-mark" src="/icons/icon.svg" alt="AR Academy" width="64" height="64" style="margin-bottom:12px">
-    <div class="steps" id="dots"><i class="on"></i><i></i></div>
+    <div class="steps" id="dots"><i class="on"></i><i></i><i></i></div>
     <div id="p1">
       <h1>Which <em>board</em> are you in?</h1>
       <p class="sub">We will show only the notes that match you.</p>
@@ -24,8 +24,13 @@
       <h1 id="t2"></h1>
       <p class="sub" id="s2"></p>
       <div class="pick two-col" id="opts"></div>
-      <button class="btn white hoverable block" id="go" disabled>Start learning</button>
-      <button class="link" id="back">Back</button>
+      <button class="link" id="back2">Back</button>
+    </div>
+    <div id="p3" hidden>
+      <h1>Pick your <em>semester</em></h1>
+      <p class="sub" id="s3"></p>
+      <div class="pick two-col sems" id="sems"><button class="opt sm liquid-glass hoverable" data-sem="1"><b>Sem 1</b><span>Winter exam</span></button><button class="opt sm liquid-glass hoverable" data-sem="2"><b>Sem 2</b><span>Summer exam</span></button><button class="opt sm liquid-glass hoverable" data-sem="3"><b>Sem 3</b><span>Winter exam</span></button><button class="opt sm liquid-glass hoverable" data-sem="4"><b>Sem 4</b><span>Summer exam</span></button><button class="opt sm liquid-glass hoverable" data-sem="5"><b>Sem 5</b><span>Winter exam</span></button><button class="opt sm liquid-glass hoverable" data-sem="6"><b>Sem 6</b><span>Summer exam</span></button></div>
+      <button class="link" id="back3">Back</button>
     </div>
     <p class="msg" id="msg"></p>
   </div>
@@ -35,13 +40,24 @@ import { requireUser, api, BRANCH, BRANCH_PICK, MEDIUM, MEDIUM_NATIVE } from '/j
 const $ = id => document.getElementById(id);
 const me = await requireUser(true);
 if (me.onboarded !== false) location.replace('/dashboard');
-let board = '', val = '';
+let board = '', branch = '';
 const dots = $('dots').children;
+const show = n => {
+  ['p1', 'p2', 'p3'].forEach((p, i) => { $(p).hidden = i !== n; });
+  [...dots].forEach((d, i) => d.classList.toggle('on', i === n));
+  $('msg').textContent = '';
+};
+async function save(extra) {
+  $('msg').textContent = 'Saving...';
+  try {
+    await api('/api/me', { board, onboarded: true, ...extra }, { method: 'PATCH' });
+    await requireUser(true);
+    location.replace('/dashboard');
+  } catch (e) { $('msg').textContent = e.message; }
+}
 function step2(b) {
-  board = b; val = '';
-  $('p1').hidden = true; $('p2').hidden = false;
-  dots[0].classList.remove('on'); dots[1].classList.add('on');
-  $('go').disabled = true;
+  board = b;
+  show(1);
   if (b === 'msbte') {
     $('t2').innerHTML = 'Pick your <em>branch</em>';
     $('s2').textContent = 'MSBTE Diploma. Choose your engineering department.';
@@ -55,19 +71,19 @@ function step2(b) {
 document.querySelectorAll('[data-b]').forEach(x => x.onclick = () => step2(x.dataset.b));
 $('opts').addEventListener('click', e => {
   const o = e.target.closest('[data-v]'); if (!o) return;
-  val = o.dataset.v;
-  $('opts').querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === o));
-  $('go').disabled = false;
+  o.classList.add('on');
+  if (board === 'ssc') return save({ medium: o.dataset.v });
+  branch = o.dataset.v;
+  $('s3').textContent = BRANCH[branch] + '. Which semester are you in?';
+  setTimeout(() => show(2), 180);
 });
-$('back').onclick = () => { $('p1').hidden = false; $('p2').hidden = true; dots[0].classList.add('on'); dots[1].classList.remove('on'); };
-$('go').onclick = async () => {
-  $('go').disabled = true; $('go').textContent = 'Saving...';
-  try {
-    await api('/api/me', board === 'ssc' ? { board, medium: val, onboarded: true } : { board, branch: val, onboarded: true }, { method: 'PATCH' });
-    await requireUser(true);
-    location.replace('/dashboard');
-  } catch (e) { $('msg').textContent = e.message; $('go').disabled = false; $('go').textContent = 'Start learning'; }
-};
+$('sems').addEventListener('click', e => {
+  const o = e.target.closest('[data-sem]'); if (!o) return;
+  o.classList.add('on');
+  save({ branch, semester: o.dataset.sem });
+});
+$('back2').onclick = () => show(0);
+$('back3').onclick = () => show(1);
 </script>
 </body>
 </html>

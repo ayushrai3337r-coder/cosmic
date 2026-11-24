@@ -47,11 +47,21 @@ jobs:
             echo "::warning::KEYSTORE_B64 secret is missing. A new key is used each build, so Google sign in will not work."
           fi
 
-      - name: Build APK
+      - name: Set the app version (needed by Google Play, must go up each build)
+        run: |
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" mobile/android/app/build.gradle
+          grep -n "versionCode\|versionName" mobile/android/app/build.gradle
+
+      - name: Build APK and AAB
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug bundleRelease --no-daemon
+
+      - name: Sign the AAB
+        run: |
+          jarsigner -keystore ~/.android/debug.keystore -storepass android -keypass android -sigalg SHA256withRSA -digestalg SHA-256 mobile/android/app/build/outputs/bundle/release/app-release.aab androiddebugkey
+          cp mobile/android/app/build/outputs/bundle/release/app-release.aab ar-academy.aab
 
       - name: Show the signing SHA-1
         run: |
@@ -67,4 +77,6 @@ jobs:
           tag_name: app-${{ github.run_number }}
           name: AR Academy app ${{ github.run_number }}
           make_latest: true
-          files: ar-academy.apk
+          files: |
+            ar-academy.apk
+            ar-academy.aab
