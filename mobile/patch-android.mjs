@@ -49,11 +49,7 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
 fs.writeFileSync(dir + '/UpiPlugin.java', `package ${pkg};
 
 import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.Signature;
-import android.os.Build;
-import java.security.MessageDigest;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import com.getcapacitor.JSArray;
@@ -86,31 +82,6 @@ public class UpiPlugin extends Plugin {
     JSObject ret = new JSObject();
     ret.put("apps", out);
     call.resolve(ret);
-  }
-
-  @PluginMethod
-  public void sig(PluginCall call) {
-    try {
-      PackageManager pm = getContext().getPackageManager();
-      String name = getContext().getPackageName();
-      Signature[] sigs;
-      if (Build.VERSION.SDK_INT >= 28) {
-        PackageInfo pi = pm.getPackageInfo(name, PackageManager.GET_SIGNING_CERTIFICATES);
-        sigs = pi.signingInfo.getApkContentsSigners();
-      } else {
-        PackageInfo pi = pm.getPackageInfo(name, PackageManager.GET_SIGNATURES);
-        sigs = pi.signatures;
-      }
-      byte[] d = MessageDigest.getInstance("SHA-1").digest(sigs[0].toByteArray());
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < d.length; i++) { if (i > 0) sb.append(':'); sb.append(String.format("%02X", d[i])); }
-      JSObject ret = new JSObject();
-      ret.put("pkg", name);
-      ret.put("sha", sb.toString());
-      call.resolve(ret);
-    } catch (Exception e) {
-      call.reject("No signature");
-    }
   }
 
   @PluginMethod

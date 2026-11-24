@@ -22,7 +22,7 @@
       <p class="sub">Tap the button to go back to the AR Academy app.</p>
       <a class="btn white hoverable block" id="open">Open AR Academy</a>
     </div>
-    <p class="msg" id="msg" style="word-break:break-word;overflow-wrap:anywhere"></p>
+    <p class="msg" id="msg"></p>
     <button class="link" id="alt" hidden>Sign in with the browser instead</button>
     <p class="switch">One account works on one device only.</p>
   </div>
@@ -63,7 +63,7 @@ async function nativeLogin() {
   const a = await firebase();
   if (!S || !cfg.googleWebClientId) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
   await S.initialize({ google: { webClientId: cfg.googleWebClientId } });
-  const r = await S.login({ provider: 'google', options: { filterByAuthorizedAccounts: false } });
+  const r = await S.login({ provider: 'google', options: {} });
   const gid = r && r.result && r.result.idToken;
   if (!gid) throw Object.assign(new Error('native-missing'), { code: 'native-missing' });
   const cred = await a.signInWithCredential(auth, a.GoogleAuthProvider.credential(gid));
@@ -135,12 +135,10 @@ $('g').onclick = async () => {
     if (NATIVE) {
       try { await submit(await nativeLogin()); }
       catch (e) {
-        let sg = '';
-        try { const r = await plug('Upi').sig(); sg = ' [app ' + r.pkg + ' SHA-1 ' + r.sha + ']'; } catch (x) {}
-        if (/cancel/i.test(String(e.message))) { say('Cancelled: ' + String(e.message).slice(0, 160) + ' [client ' + String((cfg && cfg.googleWebClientId) || 'none') + ']' + sg); $('alt').hidden = false; }
+        if (/cancel/i.test(String(e.message))) say('Sign in was cancelled.');
         else {
           const why = e.code === 'native-missing' ? (cfg && !cfg.googleWebClientId ? 'GOOGLE_WEB_CLIENT_ID is not set in Vercel.' : 'The Google sign in plugin is not in this app build.') : String(e.message || e).slice(0, 140);
-          say('In-app Google sign in could not start. ' + why + sg);
+          say('In-app Google sign in could not start. ' + why);
           $('alt').hidden = false;
         }
       }
