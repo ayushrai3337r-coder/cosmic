@@ -70,12 +70,10 @@ async function findOrCreate(g, p) {
   return { u };
 }
 
-/* one email = one device. The first device that signs in is the only one allowed until an admin resets it */
+/* one account = one active session. A new sign in (app or browser) always works and signs the older one out, so it never shows an error */
 async function startSession(u, dev, res) {
   const token = crypto.randomBytes(32).toString('hex');
-  const r = await sql`update users set session_hash = ${sha(token)}, session_at = now(), device_id = ${dev}
-    where id = ${u.id} and (device_id is null or device_id = ${dev}) returning id`;
-  if (!r[0]) return res.status(403).json({ error: DEVICE_MSG, code: 'DEVICE' });
+  await sql`update users set session_hash = ${sha(token)}, session_at = now(), device_id = ${dev} where id = ${u.id}`;
   res.json({ token, user: pubUser(u) });
 }
 
@@ -294,6 +292,43 @@ app.post('/api/orders/:id/shot', auth, wrap(async (req, res) => {
     try { result = await quickApprove(o, pid); } catch (e) { console.error('quick approve failed', e.message); }
   }
   res.json({ ok: true, result });
+}));
+
+/* ---------- chat: every student has a private thread with the admin ---------- */
+app.get('/api/chat', auth, limit('chat', 90, 60000), wrap(async (req, res) => {
+  const after = parseInt(req.query.after) || 0;
+  const rows = await sql`select id, from_admin as "fromAdmin", body, created_at as "at" from messages where user_id = ${req.user.id} and id > ${after} order by id limit 200`;
+  if (rows.some(r => r.fromAdmin)) await sql`update messages set seen = true where user_id = ${req.user.id} and from_admin and not seen`;
+  res.json({ messages: rows });
+}));
+app.get('/api/chat/unread', auth, limit('chat', 90, 60000), wrap(async (req, res) => {
+  res.json({ unread: (await sql`select count(*)::int as c from messages where user_id = ${req.user.id} and from_admin and not seen`)[0].c });
+}));
+app.post('/api/chat', auth, limit('chatsend', 20, 60000), wrap(async (req, res) => {
+  const body = clean(req.body.body, 1000);
+  if (!body) return res.status(400).json({ error: 'Type a message first' });
+  const day = (await sql`select count(*)::int as c from messages where user_id = ${req.user.id} and not from_admin and created_at > now() - interval '1 day'`)[0].c;
+  if (day >= 200) return res.status(429).json({ error: 'Too many messages today. Please try again tomorrow.' });
+  const m = (await sql`insert into messages (user_id, body) values (${req.user.id}, ${body}) returning id, created_at as "at"`)[0];
+  res.json({ ok: true, message: { id: m.id, fromAdmin: false, body, at: m.at } });
+}));
+app.get('/api/admin/chats', adminOnly, wrap(async (req, res) => {
+  res.json({ chats: await sql`select u.id, u.first_name || ' ' || u.last_name as name, coalesce(u.email, u.phone) as email, u.board, u.branch,
+      (select body from messages m where m.user_id = u.id order by m.id desc limit 1) as last,
+      (select created_at from messages m where m.user_id = u.id order by m.id desc limit 1) as "lastAt",
+      (select count(*)::int from messages m where m.user_id = u.id and not m.from_admin and not m.seen) as unread
+    from users u where exists (select 1 from messages m where m.user_id = u.id) order by "lastAt" desc limit 300` });
+}));
+app.get('/api/admin/chats/:id', adminOnly, wrap(async (req, res) => {
+  const uid = parseInt(req.params.id) || 0;
+  await sql`update messages set seen = true where user_id = ${uid} and not from_admin and not seen`;
+  res.json({ messages: await sql`select id, from_admin as "fromAdmin", body, created_at as "at" from messages where user_id = ${uid} order by id limit 500` });
+}));
+app.post('/api/admin/chats/:id', adminOnly, wrap(async (req, res) => {
+  const body = clean(req.body.body, 1000), uid = parseInt(req.params.id) || 0;
+  if (!body || !uid) return res.status(400).json({ error: 'Empty message' });
+  await sql`insert into messages (user_id, from_admin, body) values (${uid}, true, ${body})`;
+  res.json({ ok: true });
 }));
 
 app.get('/api/notes/:id/file', auth, limit('file', 40, 60000), wrap(async (req, res) => {

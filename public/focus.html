@@ -40,7 +40,6 @@ view.innerHTML = `
         <div class="two-stat"><div><b id="st">0</b><span>day streak</span></div><div><b id="ss">0</b><span>sessions</span></div></div>
       </div>
       <div class="card liquid-glass reveal" style="--d:.3s"><div class="eyebrow">This week</div><div class="bars wk" id="wk"></div></div>
-      <div class="card liquid-glass reveal" style="--d:.3s" id="lk"><div class="eyebrow">App lock</div><div id="lk-b"></div></div>
       <div class="card liquid-glass music reveal" style="--d:.35s"><div class="eyebrow">Study music</div>
         <div class="np"><div class="np-t" id="np-t">No song playing</div><div class="np-s muted" id="np-s">Add songs from your phone</div></div>
         <input type="range" class="seek" id="sk" min="0" max="1000" value="0" aria-label="Seek">
@@ -152,51 +151,6 @@ $('m-l').onclick = async e => {
   if (x) { await songs.remove(Number(x.dataset.x)); await player.load(); } else if (r) player.play(Number(r.dataset.i));
 };
 player.load().then(mdraw);
-
-/* app lock: sends chosen apps away for a set time (Android app only) */
-const AL = isApp() && window.Capacitor && window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('AppLock') : null;
-let lkTimer = null, lkApps = null;
-async function lockDraw() {
-  const b = $('lk-b');
-  clearInterval(lkTimer);
-  if (!AL) { b.innerHTML = '<p class="muted" style="margin-top:8px">Block distracting apps while you study. This works in the AR Academy Android app.</p>'; return; }
-  let st;
-  try { st = await AL.status(); } catch (e) { b.innerHTML = '<p class="muted" style="margin-top:8px">App lock is not available on this phone.</p>'; return; }
-  if (st.active) {
-    const end = Date.now() + st.remaining;
-    b.innerHTML = '<div class="big-num"><b id="lk-t"></b><span>locked &middot; ' + st.count + ' app' + (st.count > 1 ? 's' : '') + '</span></div><p class="muted" style="margin-top:8px">The chosen apps stay blocked until the time ends. Stay with your books!</p>';
-    const go = () => { const s = Math.max(0, Math.round((end - Date.now()) / 1000)); $('lk-t').textContent = fmt(s); if (s <= 0) lockDraw(); };
-    go(); lkTimer = setInterval(go, 1000);
-    return;
-  }
-  if (!st.enabled) {
-    b.innerHTML = '<p class="muted" style="margin:8px 0 12px">One-time setup: turn on <b>AR Academy Focus Lock</b> in Accessibility settings. It only sends the apps you choose back here. It does not read your screen.</p><button class="btn white hoverable block" id="lk-set">Open settings</button><p class="muted" style="margin-top:10px;font-size:.68rem">Settings &rarr; Accessibility &rarr; Installed apps (or Downloaded apps) &rarr; AR Academy Focus Lock &rarr; turn on. Then come back here.</p>';
-    $('lk-set').onclick = () => AL.settings().catch(() => toast('Could not open settings'));
-    return;
-  }
-  const sel = new Set(pref.get('lockApps', [])), mins = pref.get('lockMins', 30);
-  b.innerHTML = '<p class="muted" style="margin:8px 0 10px"><span id="lk-n">' + sel.size + '</span> apps chosen</p><button class="btn liquid-glass hoverable block" id="lk-pick">Choose apps to block</button><div class="chips center" id="lk-m" style="margin:14px 0 12px">' + [15, 30, 45, 60, 90, 120].map(m => '<button class="chip liquid-glass hoverable ' + (m === mins ? 'on' : '') + '" data-m="' + m + '">' + m + ' min</button>').join('') + '</div><button class="btn white hoverable block" id="lk-go">Start lock</button><p class="muted" style="margin-top:10px;font-size:.68rem">You cannot unlock early, so choose a time you can stick to.</p>';
-  let m = mins;
-  $('lk-m').onclick = e => { const c = e.target.closest('[data-m]'); if (!c) return; m = Number(c.dataset.m); $('lk-m').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c)); };
-  $('lk-pick').onclick = async () => {
-    $('lk-pick').disabled = true;
-    try { lkApps = lkApps || (await AL.apps()).apps.sort((a, c) => a.name.localeCompare(c.name)); } catch (e) { toast('Could not load your apps'); $('lk-pick').disabled = false; return; }
-    $('lk-pick').disabled = false;
-    document.body.insertAdjacentHTML('beforeend', '<div class="modal open" id="ap"><div class="box liquid-glass-strong" style="max-height:88vh;display:flex;flex-direction:column"><h3>Choose apps to block</h3><input class="input" id="ap-q" placeholder="Search apps" style="margin-bottom:12px"><div class="applist" id="ap-l"></div><div class="acts" style="margin-top:14px"><button class="btn white hoverable" id="ap-ok">Done</button></div></div></div>');
-    const list = () => { const q = $('ap-q').value.toLowerCase(); $('ap-l').innerHTML = lkApps.filter(a => a.name.toLowerCase().includes(q)).map(a => '<label class="aprow"><img alt="" width="36" height="36" src="data:image/png;base64,' + a.icon + '"><span>' + esc(a.name) + '</span><input type="checkbox" data-p="' + esc(a.package) + '" ' + (sel.has(a.package) ? 'checked' : '') + '></label>').join(''); };
-    list();
-    $('ap-q').oninput = list;
-    $('ap-l').onchange = e => { const c = e.target.closest('[data-p]'); if (!c) return; c.checked ? sel.add(c.dataset.p) : sel.delete(c.dataset.p); };
-    $('ap-ok').onclick = () => { pref.set('lockApps', [...sel]); $('ap').remove(); $('lk-n').textContent = sel.size; };
-  };
-  $('lk-go').onclick = async () => {
-    if (!sel.size) return toast('Choose at least one app');
-    if (!confirm('Block ' + sel.size + ' app' + (sel.size > 1 ? 's' : '') + ' for ' + m + ' minutes? You will not be able to open them until the time ends.')) return;
-    try { await AL.start({ packages: [...sel], minutes: m }); pref.set('lockMins', m); toast('Focus lock is on'); lockDraw(); } catch (e) { toast(String(e.message || 'Could not start the lock').slice(0, 80)); }
-  };
-}
-lockDraw();
-document.addEventListener('visibilitychange', () => { if (!document.hidden) lockDraw(); });
 
 /* exam countdown */
 function cd() {

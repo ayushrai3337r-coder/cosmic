@@ -1,5 +1,5 @@
-const C = 'ara-v8';
-const PRE = ['/', '/intro', '/login', '/welcome', '/dashboard', '/notes', '/exams', '/focus', '/account', '/viewer', '/css/glass.css', '/js/app.js', '/js/offline.js', '/js/timetable.js', '/js/music.js', '/icons/icon.svg', '/icons/apple-touch.png', '/bg.jpg', '/manifest.json'];
+const C = 'ara-v9';
+const PRE = ['/', '/intro', '/login', '/welcome', '/dashboard', '/notes', '/exams', '/focus', '/account', '/chat', '/viewer', '/css/glass.css', '/js/app.js', '/js/offline.js', '/js/timetable.js', '/js/music.js', '/icons/icon.svg', '/icons/apple-touch.png', '/bg.jpg', '/manifest.json'];
 const FONT = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => Promise.allSettled(PRE.map(u => c.add(u)))).then(() => self.skipWaiting()));

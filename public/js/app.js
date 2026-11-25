@@ -43,6 +43,7 @@ const P = {
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'
 };
 export const icon = n => `<svg class="ic" viewBox="0 0 24 24">${P[n]}</svg>`;
@@ -139,7 +140,9 @@ export function mountShell(active, eyebrow, title, sub) {
         <div id="view"></div>
       </main>
     </div>
-    <nav class="dock liquid-glass-strong">${dock}</nav>`);
+    <nav class="dock liquid-glass-strong">${dock}</nav>
+    ${active === 'chat' || active === 'viewer' ? '' : `<a class="chat-fab" href="/chat" aria-label="Message us">${icon('chat')}<i id="chat-dot" hidden></i></a>`}`);
+  if (active !== 'chat' && active !== 'viewer') api('/api/chat/unread').then(r => { const d = document.getElementById('chat-dot'); if (d && r.unread) d.hidden = false; }).catch(() => {});
   const net = document.createElement('div');
   net.className = 'toast liquid-glass-strong';
   net.textContent = 'You are offline. Saved notes still open.';
@@ -252,6 +255,22 @@ export function payModal(onDone) {
   async function drawQr() {
     const box = $('pm-code'), o = cur;
     box.textContent = '';
+    if (conf.payQr && /^upi:/i.test(conf.payQr)) {
+      box.textContent = 'Loading...';
+      if (await loadQr() && cur === o) {
+        const q = window.qrcode(0, 'M');
+        q.addData(conf.payQr);
+        q.make();
+        const im = new Image();
+        im.alt = 'UPI QR code';
+        im.style.cssText = 'width:100%;height:100%;image-rendering:pixelated';
+        im.src = q.createDataURL(6, 0);
+        box.textContent = '';
+        box.appendChild(im);
+        $('pm-hint').textContent = 'Scan with any UPI app and enter the amount shown above.';
+      } else box.textContent = 'Could not load the QR. Use the UPI app option.';
+      return;
+    }
     if (conf.payQr) {
       const img = new Image();
       img.alt = 'UPI QR code';

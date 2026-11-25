@@ -35,6 +35,7 @@
       <button class="chip liquid-glass hoverable" data-t="upload">Upload</button>
       <button class="chip liquid-glass hoverable" data-t="notes">Notes</button>
       <button class="chip liquid-glass hoverable" data-t="users">Users</button>
+      <button class="chip liquid-glass hoverable" data-t="chat">Messages <span id="cn"></span></button>
       <button class="chip liquid-glass hoverable" data-t="out">Sign out</button>
     </div>
     <div id="v"></div>
@@ -50,7 +51,7 @@ const A = { admin: true };
 let D = { orders: [], users: [], notes: [] }, tab = 'orders', filt = 'all', q = '';
 
 async function load() {
-  try { D = await api('/api/admin/data', undefined, A); $('gate').hidden = true; $('panel').hidden = false; draw(); }
+  try { D = await api('/api/admin/data', undefined, A); $('gate').hidden = true; $('panel').hidden = false; draw(); chatLoad(); }
   catch (e) { sessionStorage.removeItem('at'); $('panel').hidden = true; $('gate').hidden = false; $('msg').textContent = 'Session ended. Enter the password again.'; }
 }
 $('in').onclick = async () => {
@@ -195,9 +196,45 @@ function usersView() {
     </div>`).join('') || '<div class="empty">No users yet</div>'}</div>`;
 }
 
+/* ---------- messages: one private thread per student ---------- */
+let CH = [], CU = null, CM = [];
+const chatView = () => CU
+  ? `<div class="row liquid-glass" style="margin-bottom:10px"><button class="btn liquid-glass hoverable sm" id="c-back">Back</button><div class="grow"><h3>${esc(CU.name.trim() || 'Student')}</h3><div class="muted">${esc(CU.email || '')}</div></div></div>
+     <div class="chat liquid-glass" style="max-width:none;height:56vh"><div class="chat-list" id="cl">${CM.map(m => `<div class="bub ${m.fromAdmin ? 'me' : 'them'}"><div>${esc(m.body)}</div><small>${fmtDate(m.at)}</small></div>`).join('') || '<div class="muted" style="text-align:center;padding:20px">No messages</div>'}</div>
+     <form class="chat-in" id="c-form"><input class="input" id="c-t" maxlength="1000" placeholder="Reply to this student" autocomplete="off"><button class="btn white hoverable" type="submit">Send</button></form></div>`
+  : `<div class="list">${CH.map(c => `<button class="row liquid-glass hoverable" data-c="${c.id}" style="width:100%;text-align:left"><div class="grow"><h3>${esc(c.name.trim() || 'Student')}</h3><div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46vw">${esc(c.last || '')}</div></div>${c.unread ? `<span class="tag ok">${c.unread} new</span>` : ''}<span class="muted">${fmtDate(c.lastAt)}</span></button>`).join('') || '<div class="empty">No messages yet</div>'}</div>`;
+async function chatLoad() {
+  try {
+    if (CU) {
+      CM = (await api('/api/admin/chats/' + CU.id, undefined, A)).messages;
+      if (tab === 'chat' && CU) { const l = $('cl'); const keep = l ? l.scrollHeight - l.scrollTop - l.clientHeight < 80 : true; const t = $('c-t') ? $('c-t').value : ''; $('v').innerHTML = chatView(); if ($('c-t')) $('c-t').value = t; if (keep && $('cl')) $('cl').scrollTop = $('cl').scrollHeight; }
+    } else {
+      CH = (await api('/api/admin/chats', undefined, A)).chats;
+      if (tab === 'chat' && !CU) $('v').innerHTML = chatView();
+    }
+    const n = CH.reduce((a, c) => a + c.unread, 0);
+    $('cn').textContent = n ? '(' + n + ')' : '';
+  } catch (e) {}
+}
+setInterval(() => { if (!document.hidden && !$('panel').hidden) chatLoad(); }, 8000);
+$('v').addEventListener('click', e => {
+  const c = e.target.closest('[data-c]');
+  if (c) { CU = CH.find(x => String(x.id) === c.dataset.c); chatLoad().then(() => { const l = $('cl'); if (l) l.scrollTop = l.scrollHeight; }); }
+  if (e.target.closest('#c-back')) { CU = null; chatLoad(); }
+});
+$('v').addEventListener('submit', async e => {
+  if (e.target.id !== 'c-form') return;
+  e.preventDefault();
+  const t = $('c-t').value.trim();
+  if (!t || !CU) return;
+  $('c-t').value = '';
+  try { await api('/api/admin/chats/' + CU.id, { body: t }, A); await chatLoad(); const l = $('cl'); if (l) l.scrollTop = l.scrollHeight; } catch (err) { toast(err.message); }
+});
+
 function draw() {
   document.querySelectorAll('#tabs .chip').forEach(c => c.classList.toggle('on', c.dataset.t === tab));
-  $('v').innerHTML = { orders: ordersView, sales: salesView, upload: uploadView, notes: notesView, users: usersView }[tab]();
+  $('v').innerHTML = { orders: ordersView, sales: salesView, upload: uploadView, notes: notesView, users: usersView, chat: chatView }[tab]();
+  if (tab === 'chat') chatLoad();
   if (tab === 'upload') pickSum();
   const s = $('q');
   if (s && q) { s.focus(); s.setSelectionRange(q.length, q.length); }

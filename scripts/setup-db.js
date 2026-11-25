@@ -60,6 +60,15 @@ const statements = [
   `create index if not exists orders_user on orders (user_id, created_at desc)`,
   `create index if not exists orders_note on orders (note_id)`,
   `create index if not exists orders_status on orders (status, created_at desc)`,
+  `create table if not exists messages (
+    id serial primary key,
+    user_id int not null references users(id) on delete cascade,
+    from_admin boolean not null default false,
+    body text not null,
+    seen boolean not null default false,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists messages_user on messages (user_id, id)`,
   `create table if not exists app_codes (
     code_hash text primary key,
     user_id int not null references users(id) on delete cascade,
