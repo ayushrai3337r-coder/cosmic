@@ -262,6 +262,21 @@ async function autoCheck(o, pid) {
   return 'pending';
 }
 
+/* No API key: approve at once, but never the same image twice. You review later in the admin panel and can Reject (access is removed). */
+async function quickApprove(o, pid) {
+  const img = await fetch(signedUrl(pid, 'image'), { signal: AbortSignal.timeout(12000) });
+  if (!img.ok) throw new Error('image fetch ' + img.status);
+  const buf = Buffer.from(await img.arrayBuffer());
+  if (buf.length < 5000) { await sql`update orders set status = 'rejected', auto_note = 'Image too small to be a payment screenshot' where id = ${o.id}`; return 'rejected'; }
+  try { await sql`update orders set shot_hash = ${sha(buf.toString('base64'))} where id = ${o.id}`; }
+  catch (e) {
+    if (e.code === '23505') { await sql`update orders set status = 'rejected', auto_note = 'This image was already used for another payment' where id = ${o.id}`; return 'rejected'; }
+    throw e;
+  }
+  await sql`update orders set status = 'approved', auto_note = 'Approved automatically. Please check the screenshot' where id = ${o.id} and status = 'pending'`;
+  return 'approved';
+}
+
 app.post('/api/orders/:id/shot-sign', auth, limit('sign', 20, 60000), wrap(async (req, res) => {
   const o = await myPendingOrder(req);
   if (!o) return res.status(404).json({ error: 'Payment not found' });
@@ -275,6 +290,8 @@ app.post('/api/orders/:id/shot', auth, wrap(async (req, res) => {
   let result = 'pending';
   if (E.ANTHROPIC_API_KEY) {
     try { result = await autoCheck(o, pid); } catch (e) { console.error('autocheck failed', e.message); }
+  } else {
+    try { result = await quickApprove(o, pid); } catch (e) { console.error('quick approve failed', e.message); }
   }
   res.json({ ok: true, result });
 }));
