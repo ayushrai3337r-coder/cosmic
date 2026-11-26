@@ -105,7 +105,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 app.get('/api/config', (req, res) => res.json({
   apiKey: E.FIREBASE_API_KEY, authDomain: E.FIREBASE_AUTH_DOMAIN, projectId: E.FIREBASE_PROJECT_ID, appId: E.FIREBASE_APP_ID,
-  upiId: E.UPI_ID || '', payQr: E.PAY_QR || '', googleWebClientId: E.GOOGLE_WEB_CLIENT_ID || '', supportEmail: E.SUPPORT_EMAIL || ''
+  upiId: E.UPI_ID || '', payeeName: E.PAYEE_NAME || 'AR Academy', payQr: E.PAY_QR || '', googleWebClientId: E.GOOGLE_WEB_CLIENT_ID || '', supportEmail: E.SUPPORT_EMAIL || ''
 }));
 
 /* ---------- auth ---------- */

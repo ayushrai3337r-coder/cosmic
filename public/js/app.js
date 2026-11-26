@@ -244,7 +244,7 @@ export function payModal(onDone) {
     </div></div>`);
   const $ = id => document.getElementById(id);
   let cur = null, conf = {};
-  const upiLink = o => 'upi://pay?pa=' + encodeURIComponent(conf.upiId) + '&pn=' + encodeURIComponent('AR Academy') + '&am=' + Number(o.amount).toFixed(2) + '&cu=INR&tn=' + encodeURIComponent('AR Academy ' + o.id);
+  const upiLink = o => 'upi://pay?pa=' + encodeURIComponent(conf.upiId) + '&pn=' + encodeURIComponent(conf.payeeName || 'AR Academy') + '&am=' + Number(o.amount).toFixed(2) + '&cu=INR&tn=' + encodeURIComponent('AR Academy ' + o.id);
 
   function tab(m) {
     $('pm-app').hidden = m !== 'app';
